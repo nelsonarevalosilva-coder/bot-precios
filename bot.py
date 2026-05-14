@@ -299,22 +299,4 @@ def run_scan():
     log.info(f"=== Escaneo completo. {nuevas_alertas} nuevas alertas enviadas ===\n")
 
 
-def main():
-    log.info("🤖 Bot Cazador de Precios iniciado")
-    log.info(f"   Umbral de descuento: {UMBRAL_DESCUENTO}%")
-    log.info(f"   Intervalo: cada {INTERVALO_MIN} minutos")
-    log.info(f"   Productos monitoreados: {len(PRODUCTOS)}")
 
-    # Primer escaneo inmediato
-    run_scan()
-
-    # Programar escaneos periódicos
-    schedule.every(INTERVALO_MIN).minutes.do(run_scan)
-
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
-
-
-if __name__ == "__main__":
-    main()
