@@ -420,6 +420,29 @@ def scrape_tricot(query, precio_ref):
     except Exception as e:
         log.warning(f"Tricot error: {e}")
     return resultados
+
+
+def scrape_eliteperfumes(query, precio_ref):
+    resultados = []
+    try:
+        url = f"https://www.eliteperfumes.cl/search?q={requests.utils.quote(query)}"
+        r = requests.get(url, headers=HEADERS, timeout=12)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for item in soup.select(".product-item, .grid__item, .product-card")[:5]:
+            try:
+                nombre_el = item.select_one(".product-item__title, .grid-product__title, .product-card__name")
+                precio_el = item.select_one(".product-item__price, .grid-product__price, .product-card__price")
+                link_el   = item.select_one("a[href]")
+                if not (nombre_el and precio_el): continue
+                precio = limpiar_precio(precio_el.get_text(strip=True))
+                link = "https://www.eliteperfumes.cl" + link_el["href"] if link_el else url
+                if precio:
+                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Elite Perfumes", precio, precio_ref, link))
+            except Exception:
+                continue
+    except Exception as e:
+        log.warning(f"Elite Perfumes error: {e}")
+    return resultados
  
  
 def enviar_telegram(mensaje):
@@ -484,6 +507,7 @@ def run_scan():
         todos += scrape_jumbo(query, precio_ref)
         todos += scrape_dafiti(query, precio_ref)
         todos += scrape_tricot(query, precio_ref)
+        todos += scrape_eliteperfumes(query, precio_ref)
  
         errores = [p for p in todos if p.es_error]
         log.info(f"  -> {len(todos)} resultados, {len(errores)} posibles errores")
