@@ -429,10 +429,10 @@ def scrape_eliteperfumes(query, precio_ref):
         url = f"https://www.eliteperfumes.cl/search?q={requests.utils.quote(query)}"
         r = requests.get(url, headers=HEADERS, timeout=12)
         soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-item, .grid__item, .product-card")[:5]:
+        for item in soup.select(".grid__item, .product-item")[:5]:
             try:
-                nombre_el = item.select_one(".product-item__title, .grid-product__title, .product-card__name")
-                precio_el = item.select_one(".product-item__price, .grid-product__price, .product-card__price")
+                nombre_el = item.select_one(".grid-product__title, .product-item__title")
+                precio_el = item.select_one(".js-value")
                 link_el   = item.select_one("a[href]")
                 if not (nombre_el and precio_el): continue
                 precio = limpiar_precio(precio_el.get_text(strip=True))
