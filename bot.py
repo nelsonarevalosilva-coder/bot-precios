@@ -426,19 +426,18 @@ def scrape_tricot(query, precio_ref):
 def scrape_eliteperfumes(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.eliteperfumes.cl/search?q={requests.utils.quote(query)}"
+        url = f"https://www.eliteperfumes.cl/search/suggest.json?q={requests.utils.quote(query)}&resources[type]=product&resources[limit]=5"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".grid__item, .product-item")[:5]:
+        data = r.json()
+        productos = data.get("resources", {}).get("results", {}).get("products", [])
+        for item in productos:
             try:
-                nombre_el = item.select_one(".grid-product__title, .product-item__title")
-                precio_el = item.select_one(".js-value")
-                link_el   = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.eliteperfumes.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Elite Perfumes", precio, precio_ref, link))
+                nombre = item.get("title", "")
+                precio = int(float(item.get("price", "0").replace(",", "."))) // 100
+                handle = item.get("handle", "")
+                link = f"https://www.eliteperfumes.cl/products/{handle}"
+                if precio and precio > 0:
+                    resultados.append(crear_producto(nombre, "Elite Perfumes", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
