@@ -5,19 +5,18 @@ import json
 import hashlib
 import requests
 from datetime import datetime
-from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Optional
 import schedule
- 
+
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN", "TU_TOKEN_AQUI")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "TU_CHAT_ID_AQUI")
 UMBRAL_DESCUENTO = int(os.getenv("UMBRAL_DESCUENTO", "40"))
-INTERVALO_MIN    = int(os.getenv("INTERVALO_MIN", "60"))
+INTERVALO_MIN    = int(os.getenv("INTERVALO_MIN", "30"))
 DATA_FILE        = "alertas_enviadas.json"
- 
+
 PRODUCTOS = [
-    ("Fragrance World Liquid Brun EDP 100 ML (H)",                60_000),
+    ("Fragrance World Liquid Brun EDP 100 ML", 60_000),
     ("iPhone 16",                    900_000),
     ("iPhone 15",                    750_000),
     ("Samsung Galaxy S25",           800_000),
@@ -36,14 +35,12 @@ PRODUCTOS = [
     ("silla oficina ergonomica",     200_000),
     ("silla comedor",                 80_000),
     ("silla plegable",                25_000),
-    ("silla mecedora",               120_000),
     ("sillon individual",            200_000),
     ("sofa 3 cuerpos",               400_000),
     ("sofa cama",                    350_000),
     ("sillon reclinable",            250_000),
     ("sofa esquinero",               600_000),
     ("cama 2 plazas",                300_000),
-    ("cama plaza y media",           200_000),
     ("cama king",                    500_000),
     ("camarote ninos",               250_000),
     ("colchon 2 plazas",             300_000),
@@ -53,8 +50,6 @@ PRODUCTOS = [
     ("mesa comedor 6 personas",      300_000),
     ("mesa centro living",           100_000),
     ("mesa escritorio",              120_000),
-    ("mesa jardin plastico",          40_000),
-    ("mesa plegable",                 60_000),
     ("refrigerador no frost",        500_000),
     ("lavadora 10 kilos",            350_000),
     ("microondas",                    80_000),
@@ -62,11 +57,9 @@ PRODUCTOS = [
     ("freidora aire",                 80_000),
     ("aspiradora robot",             200_000),
     ("aire acondicionado split",     500_000),
-    ("calefactor electrico",          80_000),
     ("bicicleta montana",            300_000),
     ("bicicleta electrica",        1_000_000),
     ("cinta correr",                 500_000),
-    ("mancuernas ajustables",         80_000),
     ("perfume Dior Sauvage",         120_000),
     ("perfume Bleu de Chanel",       130_000),
     ("perfume Acqua di Gio",         100_000),
@@ -79,7 +72,6 @@ PRODUCTOS = [
     ("perfume Armani Code",           110_000),
     ("perfume Chanel N5",            150_000),
     ("perfume Coco Mademoiselle",    140_000),
-    ("Fragrance World Liquid Brun EDP 100 ML (H)",                60_000),
     ("perfume Miss Dior",            120_000),
     ("perfume Good Girl Carolina Herrera", 100_000),
     ("perfume 212 VIP Carolina Herrera", 95_000),
@@ -96,19 +88,18 @@ PRODUCTOS = [
     ("zapatillas Adidas",             80_000),
     ("zapatillas New Balance",        90_000),
     ("parka invierno",               100_000),
-    ("chaqueta polar",                40_000),
 ]
- 
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler()])
 log = logging.getLogger(__name__)
- 
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "es-CL,es;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept": "application/json, text/html, */*",
 }
- 
- 
+
+
 @dataclass
 class Producto:
     nombre: str
@@ -119,23 +110,23 @@ class Producto:
     descuento_pct: float = 0.0
     es_error: bool = False
     razon: str = ""
- 
+
     def id(self):
         raw = f"{self.tienda}:{self.nombre}:{self.precio}"
         return hashlib.md5(raw.encode()).hexdigest()[:12]
- 
- 
+
+
 def limpiar_precio(texto: str) -> Optional[int]:
     import re
-    texto = texto.replace(".", "").replace(",", "").replace("$", "").strip()
+    texto = str(texto).replace(".", "").replace(",", "").replace("$", "").strip()
     nums = re.findall(r"\d+", texto)
     if nums:
         val = int("".join(nums[:2]))
         if 1_000 <= val <= 50_000_000:
             return val
     return None
- 
- 
+
+
 def crear_producto(nombre, tienda, precio, precio_ref, url):
     descuento = max(0.0, (precio_ref - precio) / precio_ref * 100) if precio_ref else 0.0
     es_error = descuento >= UMBRAL_DESCUENTO
@@ -146,277 +137,314 @@ def crear_producto(nombre, tienda, precio, precio_ref, url):
         else:
             razon = f"Descuento de {descuento:.0f}% supera umbral ({UMBRAL_DESCUENTO}%)"
     return Producto(nombre=nombre, tienda=tienda, precio=precio, precio_normal=precio_ref, url=url, descuento_pct=descuento, es_error=es_error, razon=razon)
- 
- 
+
+
+# ── Falabella API ─────────────────────────────────────────────────────────────
 def scrape_falabella(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.falabella.com/falabella-cl/search?Ntt={requests.utils.quote(query)}"
+        url = f"https://www.falabella.com/s/browse/v1/listing/cl?zone=13&store=falabella&currentPage=1&sortBy=relevance&query={requests.utils.quote(query)}"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-card")[:5]:
+        data = r.json()
+        items = data.get("data", {}).get("results", [])
+        for item in items[:5]:
             try:
-                nombre_el = item.select_one(".pod-subTitle, .pod-title")
-                precio_el = item.select_one(".copy10, .prices-0")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.falabella.com" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Falabella", precio, precio_ref, link))
+                nombre = item.get("displayName", "")
+                precios = item.get("prices", [])
+                precio = None
+                for p in precios:
+                    if p.get("type") in ("offerPrice", "normalPrice"):
+                        precio = limpiar_precio(str(p.get("price", 0)))
+                        if precio:
+                            break
+                link = "https://www.falabella.com/falabella-cl/product/" + item.get("productId", "")
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Falabella", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Falabella error: {e}")
     return resultados
- 
- 
+
+
+# ── Ripley API ────────────────────────────────────────────────────────────────
 def scrape_ripley(query, precio_ref):
     resultados = []
     try:
-        url = f"https://simple.ripley.cl/search?q={requests.utils.quote(query)}"
+        url = f"https://simple.ripley.cl/api/search?q={requests.utils.quote(query)}&page=1&limit=5"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".catalog-item")[:5]:
+        data = r.json()
+        items = data.get("products", data.get("items", []))
+        for item in items[:5]:
             try:
-                nombre_el = item.select_one(".catalog-item__title, .item-name")
-                precio_el = item.select_one(".catalog-prices__offer-price, .item-price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://simple.ripley.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Ripley", precio, precio_ref, link))
+                nombre = item.get("name", item.get("displayName", ""))
+                precio = limpiar_precio(str(item.get("offerPrice", item.get("price", 0))))
+                link = "https://simple.ripley.cl" + item.get("url", "")
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Ripley", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Ripley error: {e}")
     return resultados
- 
- 
-def scrape_mercadolibre(query, precio_ref):
-    resultados = []
-    try:
-        url = f"https://listado.mercadolibre.cl/{requests.utils.quote(query.replace(' ', '-'))}"
-        r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".ui-search-result__wrapper")[:5]:
-            try:
-                nombre_el = item.select_one(".poly-component__title, .ui-search-item__title")
-                precio_el = item.select_one(".andes-money-amount__fraction")
-                link_el = item.select_one("a.poly-component__title, a.ui-search-link")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Mercado Libre", precio, precio_ref, link))
-            except Exception:
-                continue
-    except Exception as e:
-        log.warning(f"MercadoLibre error: {e}")
-    return resultados
- 
- 
+
+
+# ── Paris API ─────────────────────────────────────────────────────────────────
 def scrape_paris(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.paris.cl/search/?q={requests.utils.quote(query)}"
+        url = f"https://www.paris.cl/api/catalog_system/pub/products/search/{requests.utils.quote(query)}?_from=0&_to=4"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-tile, .plp-product-tile")[:5]:
+        data = r.json()
+        for item in data[:5]:
             try:
-                nombre_el = item.select_one(".product-name, .tile-product-name")
-                precio_el = item.select_one(".sales .value, .price-sales")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.paris.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Paris", precio, precio_ref, link))
+                nombre = item.get("productName", "")
+                items_list = item.get("items", [])
+                precio = None
+                link = f"https://www.paris.cl/{item.get('linkText', '')}/p"
+                for it in items_list:
+                    for seller in it.get("sellers", []):
+                        p = seller.get("commertialOffer", {}).get("Price", 0)
+                        if p:
+                            precio = limpiar_precio(str(p))
+                            break
+                    if precio:
+                        break
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Paris", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Paris error: {e}")
     return resultados
- 
- 
+
+
+# ── Mercado Libre API ─────────────────────────────────────────────────────────
+def scrape_mercadolibre(query, precio_ref):
+    resultados = []
+    try:
+        url = f"https://api.mercadolibre.com/sites/MLC/search?q={requests.utils.quote(query)}&limit=5"
+        r = requests.get(url, headers=HEADERS, timeout=12)
+        data = r.json()
+        for item in data.get("results", [])[:5]:
+            try:
+                nombre = item.get("title", "")
+                precio = limpiar_precio(str(item.get("price", 0)))
+                link = item.get("permalink", "")
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Mercado Libre", precio, precio_ref, link))
+            except Exception:
+                continue
+    except Exception as e:
+        log.warning(f"MercadoLibre error: {e}")
+    return resultados
+
+
+# ── Lider API ─────────────────────────────────────────────────────────────────
 def scrape_lider(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.lider.cl/catalogo/search?q={requests.utils.quote(query)}"
+        url = f"https://www.lider.cl/api/catalog_system/pub/products/search/{requests.utils.quote(query)}?_from=0&_to=4"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-card, .shelf-item")[:5]:
+        data = r.json()
+        for item in data[:5]:
             try:
-                nombre_el = item.select_one(".product-card__name, .shelf-item__title")
-                precio_el = item.select_one(".product-card__price, .shelf-item__price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.lider.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Lider", precio, precio_ref, link))
+                nombre = item.get("productName", "")
+                link = f"https://www.lider.cl/{item.get('linkText', '')}/p"
+                precio = None
+                for it in item.get("items", []):
+                    for seller in it.get("sellers", []):
+                        p = seller.get("commertialOffer", {}).get("Price", 0)
+                        if p:
+                            precio = limpiar_precio(str(p))
+                            break
+                    if precio:
+                        break
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Lider", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Lider error: {e}")
     return resultados
- 
- 
+
+
+# ── Sodimac API ───────────────────────────────────────────────────────────────
 def scrape_sodimac(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.sodimac.cl/sodimac-cl/search?Ntt={requests.utils.quote(query)}"
+        url = f"https://www.sodimac.cl/sodimac-cl/search?Ntt={requests.utils.quote(query)}&start=0&sz=5&format=json"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-card, .pod")[:5]:
+        data = r.json()
+        items = data.get("results", {}).get("products", [])
+        for item in items[:5]:
             try:
-                nombre_el = item.select_one(".product-card__name, .pod-subTitle")
-                precio_el = item.select_one(".product-card__price, .price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.sodimac.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Sodimac", precio, precio_ref, link))
+                nombre = item.get("displayName", item.get("name", ""))
+                precio = limpiar_precio(str(item.get("offerPrice", item.get("price", 0))))
+                link = "https://www.sodimac.cl" + item.get("url", "")
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Sodimac", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Sodimac error: {e}")
     return resultados
- 
- 
+
+
+# ── Easy API ──────────────────────────────────────────────────────────────────
 def scrape_easy(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.easy.cl/tienda/search?q={requests.utils.quote(query)}"
+        url = f"https://www.easy.cl/api/catalog_system/pub/products/search/{requests.utils.quote(query)}?_from=0&_to=4"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-card, .shelf-item")[:5]:
+        data = r.json()
+        for item in data[:5]:
             try:
-                nombre_el = item.select_one(".product-name, .shelf-item__title")
-                precio_el = item.select_one(".price-best, .shelf-item__price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.easy.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Easy", precio, precio_ref, link))
+                nombre = item.get("productName", "")
+                link = f"https://www.easy.cl/{item.get('linkText', '')}/p"
+                precio = None
+                for it in item.get("items", []):
+                    for seller in it.get("sellers", []):
+                        p = seller.get("commertialOffer", {}).get("Price", 0)
+                        if p:
+                            precio = limpiar_precio(str(p))
+                            break
+                    if precio:
+                        break
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Easy", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Easy error: {e}")
     return resultados
- 
- 
+
+
+# ── Hites API ─────────────────────────────────────────────────────────────────
 def scrape_hites(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.hites.com/search?q={requests.utils.quote(query)}"
+        url = f"https://www.hites.com/api/catalog_system/pub/products/search/{requests.utils.quote(query)}?_from=0&_to=4"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-item, .product-card")[:5]:
+        data = r.json()
+        for item in data[:5]:
             try:
-                nombre_el = item.select_one(".product-item-name, .product-name")
-                precio_el = item.select_one(".price, .product-price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.hites.com" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Hites", precio, precio_ref, link))
+                nombre = item.get("productName", "")
+                link = f"https://www.hites.com/{item.get('linkText', '')}/p"
+                precio = None
+                for it in item.get("items", []):
+                    for seller in it.get("sellers", []):
+                        p = seller.get("commertialOffer", {}).get("Price", 0)
+                        if p:
+                            precio = limpiar_precio(str(p))
+                            break
+                    if precio:
+                        break
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Hites", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Hites error: {e}")
     return resultados
- 
- 
+
+
+# ── La Polar API ──────────────────────────────────────────────────────────────
 def scrape_lapolar(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.lapolar.cl/search?q={requests.utils.quote(query)}"
+        url = f"https://www.lapolar.cl/api/catalog_system/pub/products/search/{requests.utils.quote(query)}?_from=0&_to=4"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-card, .product-item")[:5]:
+        data = r.json()
+        for item in data[:5]:
             try:
-                nombre_el = item.select_one(".product-card__name, .product-name")
-                precio_el = item.select_one(".product-card__price, .price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.lapolar.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "La Polar", precio, precio_ref, link))
+                nombre = item.get("productName", "")
+                link = f"https://www.lapolar.cl/{item.get('linkText', '')}/p"
+                precio = None
+                for it in item.get("items", []):
+                    for seller in it.get("sellers", []):
+                        p = seller.get("commertialOffer", {}).get("Price", 0)
+                        if p:
+                            precio = limpiar_precio(str(p))
+                            break
+                    if precio:
+                        break
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "La Polar", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"La Polar error: {e}")
     return resultados
- 
- 
+
+
+# ── Jumbo API ─────────────────────────────────────────────────────────────────
 def scrape_jumbo(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.jumbo.cl/search?q={requests.utils.quote(query)}"
+        url = f"https://www.jumbo.cl/api/catalog_system/pub/products/search/{requests.utils.quote(query)}?_from=0&_to=4"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-item, .shelf-item")[:5]:
+        data = r.json()
+        for item in data[:5]:
             try:
-                nombre_el = item.select_one(".product-item__name, .shelf-item__title")
-                precio_el = item.select_one(".product-item__price, .shelf-item__price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.jumbo.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Jumbo", precio, precio_ref, link))
+                nombre = item.get("productName", "")
+                link = f"https://www.jumbo.cl/{item.get('linkText', '')}/p"
+                precio = None
+                for it in item.get("items", []):
+                    for seller in it.get("sellers", []):
+                        p = seller.get("commertialOffer", {}).get("Price", 0)
+                        if p:
+                            precio = limpiar_precio(str(p))
+                            break
+                    if precio:
+                        break
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Jumbo", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Jumbo error: {e}")
     return resultados
- 
- 
+
+
+# ── Dafiti API ────────────────────────────────────────────────────────────────
 def scrape_dafiti(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.dafiti.cl/catalog/?q={requests.utils.quote(query)}"
+        url = f"https://www.dafiti.cl/catalog/?q={requests.utils.quote(query)}&page=1&ajaxCall=1"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".catalog-grid__item, .product-card")[:5]:
+        data = r.json()
+        items = data.get("products", {}).get("hits", [])
+        for item in items[:5]:
             try:
-                nombre_el = item.select_one(".product-card__name, .catalog-grid__name")
-                precio_el = item.select_one(".catalog-grid__price, .product-card__price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Dafiti", precio, precio_ref, link))
+                nombre = item.get("name", "")
+                precio = limpiar_precio(str(item.get("price", 0)))
+                link = item.get("url", "https://www.dafiti.cl")
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Dafiti", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Dafiti error: {e}")
     return resultados
- 
- 
+
+
+# ── Tricot API ────────────────────────────────────────────────────────────────
 def scrape_tricot(query, precio_ref):
     resultados = []
     try:
-        url = f"https://www.tricot.cl/search?q={requests.utils.quote(query)}"
+        url = f"https://www.tricot.cl/search/suggest.json?q={requests.utils.quote(query)}&resources[type]=product&resources[limit]=5"
         r = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".product-item, .product-card")[:5]:
+        data = r.json()
+        productos = data.get("resources", {}).get("results", {}).get("products", [])
+        for item in productos:
             try:
-                nombre_el = item.select_one(".product-item-name, .product-card__name")
-                precio_el = item.select_one(".price, .product-card__price")
-                link_el = item.select_one("a[href]")
-                if not (nombre_el and precio_el): continue
-                precio = limpiar_precio(precio_el.get_text(strip=True))
-                link = "https://www.tricot.cl" + link_el["href"] if link_el else url
-                if precio:
-                    resultados.append(crear_producto(nombre_el.get_text(strip=True), "Tricot", precio, precio_ref, link))
+                nombre = item.get("title", "")
+                precio = limpiar_precio(str(int(float(item.get("price", "0").replace(",", "."))) // 100))
+                handle = item.get("handle", "")
+                link = f"https://www.tricot.cl/products/{handle}"
+                if nombre and precio:
+                    resultados.append(crear_producto(nombre, "Tricot", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
@@ -424,6 +452,7 @@ def scrape_tricot(query, precio_ref):
     return resultados
 
 
+# ── Elite Perfumes API (Shopify) ──────────────────────────────────────────────
 def scrape_eliteperfumes(query, precio_ref):
     resultados = []
     try:
@@ -434,18 +463,19 @@ def scrape_eliteperfumes(query, precio_ref):
         for item in productos:
             try:
                 nombre = item.get("title", "")
-                precio = int(float(item.get("price", "0").replace(",", "."))) // 100
+                precio = limpiar_precio(str(int(float(item.get("price", "0").replace(",", "."))) // 100))
                 handle = item.get("handle", "")
                 link = f"https://www.eliteperfumes.cl/products/{handle}"
-                if precio and precio > 0:
+                if nombre and precio:
                     resultados.append(crear_producto(nombre, "Elite Perfumes", precio, precio_ref, link))
             except Exception:
                 continue
     except Exception as e:
         log.warning(f"Elite Perfumes error: {e}")
     return resultados
- 
- 
+
+
+# ── Telegram ──────────────────────────────────────────────────────────────────
 def enviar_telegram(mensaje):
     if TELEGRAM_TOKEN == "TU_TOKEN_AQUI":
         log.info(f"[MODO TEST] {mensaje}")
@@ -457,8 +487,8 @@ def enviar_telegram(mensaje):
         log.info("Alerta enviada por Telegram")
     except Exception as e:
         log.error(f"Error enviando Telegram: {e}")
- 
- 
+
+
 def formatear_alerta(p):
     ahorro = p.precio_normal - p.precio
     return (
@@ -472,27 +502,27 @@ def formatear_alerta(p):
         f"<a href='{p.url}'>Ver producto ahora</a>\n\n"
         f"{datetime.now().strftime('%d/%m/%Y %H:%M')}"
     )
- 
- 
+
+
 def cargar_alertas():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE) as f:
             return set(json.load(f))
     return set()
- 
- 
+
+
 def guardar_alerta(alerta_id, alertas):
     alertas.add(alerta_id)
     lista = list(alertas)[-500:]
     with open(DATA_FILE, "w") as f:
         json.dump(lista, f)
- 
- 
+
+
 def run_scan():
     log.info(f"=== Iniciando escaneo ({datetime.now().strftime('%H:%M:%S')}) ===")
     alertas_enviadas = cargar_alertas()
     nuevas_alertas = 0
- 
+
     for query, precio_ref in PRODUCTOS:
         log.info(f"Buscando: {query}")
         todos = []
@@ -509,10 +539,10 @@ def run_scan():
         todos += scrape_dafiti(query, precio_ref)
         todos += scrape_tricot(query, precio_ref)
         todos += scrape_eliteperfumes(query, precio_ref)
- 
+
         errores = [p for p in todos if p.es_error]
         log.info(f"  -> {len(todos)} resultados, {len(errores)} posibles errores")
- 
+
         for p in errores:
             pid = p.id()
             if pid not in alertas_enviadas:
@@ -520,33 +550,32 @@ def run_scan():
                 guardar_alerta(pid, alertas_enviadas)
                 nuevas_alertas += 1
                 time.sleep(2)
- 
-        time.sleep(3)
- 
+
+        time.sleep(2)
+
     log.info(f"=== Escaneo completo. {nuevas_alertas} nuevas alertas ===")
- 
- 
+
+
 def main():
     log.info("Bot Cazador de Precios iniciado")
     log.info(f"   Umbral de descuento: {UMBRAL_DESCUENTO}%")
     log.info(f"   Intervalo: cada {INTERVALO_MIN} minutos")
     log.info(f"   Productos monitoreados: {len(PRODUCTOS)}")
- 
+
     enviar_telegram(
         "Bot Cazador de Precios activo\n\n"
-        f"Monitoreando {len(PRODUCTOS)} productos\n"
+        f"Monitoreando {len(PRODUCTOS)} productos en 13 tiendas\n"
         f"Umbral de alerta: {UMBRAL_DESCUENTO}% de descuento\n"
         f"Escaneo cada {INTERVALO_MIN} minutos\n\n"
         "Recibiras alertas aqui cuando se detecte un error de precio."
     )
- 
+
     run_scan()
     schedule.every(INTERVALO_MIN).minutes.do(run_scan)
- 
+
     while True:
         schedule.run_pending()
         time.sleep(30)
- 
 
 
 if __name__ == "__main__":
