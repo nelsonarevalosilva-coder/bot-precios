@@ -16,7 +16,7 @@ INTERVALO_MIN    = int(os.getenv("INTERVALO_MIN", "30"))
 DATA_FILE        = "alertas_enviadas.json"
 
 PRODUCTOS = [
-    ("Fragrance World Liquid Brun EDP 100 ML", 60_000),
+    ("Fragrance World Liquid Brun EDP 100 ML (H)", 60_000),
     ("iPhone 16",                    900_000),
     ("iPhone 15",                    750_000),
     ("Samsung Galaxy S25",           800_000),
