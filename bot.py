@@ -78,6 +78,7 @@ PRODUCTOS = [
     ("perfume Armani Code",           110_000),
     ("perfume Chanel N5",            150_000),
     ("perfume Coco Mademoiselle",    140_000),
+    ("Fragrance World Liquid Brun EDP 100 ML (H)",                60_000),
     ("perfume Miss Dior",            120_000),
     ("perfume Good Girl Carolina Herrera", 100_000),
     ("perfume 212 VIP Carolina Herrera", 95_000),
