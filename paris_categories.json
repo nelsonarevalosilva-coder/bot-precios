@@ -1,0 +1,19 @@
+[
+  { "name": "Television",    "url": "https://ac.cnstrc.com/search/televisor?query=televisor" },
+  { "name": "Computadores",  "url": "https://ac.cnstrc.com/search/notebook?query=notebook" },
+  { "name": "Celulares",     "url": "https://ac.cnstrc.com/search/celular?query=celular" },
+  { "name": "Tablet",        "url": "https://ac.cnstrc.com/search/tablet?query=tablet" },
+  { "name": "Audio",         "url": "https://ac.cnstrc.com/search/audifonos?query=audifonos" },
+  { "name": "Consolas",      "url": "https://ac.cnstrc.com/search/consola?query=consola+videojuegos" },
+  { "name": "Refrigerador",  "url": "https://ac.cnstrc.com/search/refrigerador?query=refrigerador" },
+  { "name": "Lavadora",      "url": "https://ac.cnstrc.com/search/lavadora?query=lavadora" },
+  { "name": "Microondas",    "url": "https://ac.cnstrc.com/search/microondas?query=microondas" },
+  { "name": "Muebles",       "url": "https://ac.cnstrc.com/search/sofa?query=sofa" },
+  { "name": "Ropa Hombre",   "url": "https://ac.cnstrc.com/search/ropa+hombre?query=ropa+hombre" },
+  { "name": "Ropa Mujer",    "url": "https://ac.cnstrc.com/search/ropa+mujer?query=ropa+mujer" },
+  { "name": "Zapatillas",    "url": "https://ac.cnstrc.com/search/zapatillas?query=zapatillas" },
+  { "name": "Deportes",      "url": "https://ac.cnstrc.com/search/deporte?query=deporte" },
+  { "name": "Juguetes",      "url": "https://ac.cnstrc.com/search/juguetes?query=juguetes" },
+  { "name": "Perfumes",      "url": "https://ac.cnstrc.com/search/perfume?query=perfume" },
+  { "name": "Outlet",        "url": "https://ac.cnstrc.com/search/outlet?query=outlet" }
+]

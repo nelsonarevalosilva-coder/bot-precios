@@ -1,0 +1,17 @@
+[
+  { "name": "Herramientas",    "url": "https://ac.cnstrc.com/search/herramientas?query=herramientas" },
+  { "name": "Electricidad",    "url": "https://ac.cnstrc.com/search/electricidad?query=electricidad" },
+  { "name": "Jardín",          "url": "https://ac.cnstrc.com/search/jardin?query=jardin" },
+  { "name": "Pintura",         "url": "https://ac.cnstrc.com/search/pintura?query=pintura" },
+  { "name": "Muebles",         "url": "https://ac.cnstrc.com/search/muebles?query=muebles" },
+  { "name": "Iluminación",     "url": "https://ac.cnstrc.com/search/iluminacion?query=iluminacion" },
+  { "name": "Baño",            "url": "https://ac.cnstrc.com/search/bano?query=bano" },
+  { "name": "Cocina",          "url": "https://ac.cnstrc.com/search/cocina?query=cocina" },
+  { "name": "Ferretería",      "url": "https://ac.cnstrc.com/search/ferreteria?query=ferreteria" },
+  { "name": "Plomería",        "url": "https://ac.cnstrc.com/search/plomeria?query=plomeria" },
+  { "name": "Electrodomésticos","url": "https://ac.cnstrc.com/search/electrodomesticos?query=electrodomesticos" },
+  { "name": "Decoración",      "url": "https://ac.cnstrc.com/search/decoracion?query=decoracion" },
+  { "name": "Climatización",   "url": "https://ac.cnstrc.com/search/climatizacion?query=climatizacion" },
+  { "name": "Seguridad",       "url": "https://ac.cnstrc.com/search/seguridad?query=seguridad" },
+  { "name": "Outlet",          "url": "https://ac.cnstrc.com/search/outlet?query=outlet" }
+]

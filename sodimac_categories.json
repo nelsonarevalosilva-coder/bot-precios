@@ -1,0 +1,17 @@
+[
+  { "name": "Herramientas",    "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=taladro" },
+  { "name": "Electricidad",    "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=cable+electrico" },
+  { "name": "Jardín",          "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=manguera+jardin" },
+  { "name": "Pintura",         "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=pintura+latex" },
+  { "name": "Muebles",         "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=muebles" },
+  { "name": "Iluminación",     "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=iluminacion" },
+  { "name": "Baño",            "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=lavamanos" },
+  { "name": "Cocina",          "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=cocina+empotrada" },
+  { "name": "Ferretería",      "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=tornillo" },
+  { "name": "Plomería",        "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=grifo" },
+  { "name": "Electrodomésticos","url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=refrigerador" },
+  { "name": "Decoración",      "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=cojin+decorativo" },
+  { "name": "Climatización",   "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=aire+acondicionado" },
+  { "name": "Seguridad",       "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=camara+seguridad" },
+  { "name": "Outlet",          "url": "https://www.sodimac.cl/sodimac-cl/search?Ntt=outlet" }
+]

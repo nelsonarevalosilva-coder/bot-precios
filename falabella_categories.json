@@ -1,0 +1,18 @@
+[
+  { "name": "Television",    "url": "https://www.falabella.com/falabella-cl/search?Ntt=televisor" },
+  { "name": "Computadores",  "url": "https://www.falabella.com/falabella-cl/search?Ntt=notebook" },
+  { "name": "Celulares",     "url": "https://www.falabella.com/falabella-cl/search?Ntt=smartphone" },
+  { "name": "Tablet",        "url": "https://www.falabella.com/falabella-cl/search?Ntt=tablet" },
+  { "name": "Audio",         "url": "https://www.falabella.com/falabella-cl/search?Ntt=audifonos" },
+  { "name": "Consolas",      "url": "https://www.falabella.com/falabella-cl/search?Ntt=consola+videojuegos" },
+  { "name": "Refrigerador",  "url": "https://www.falabella.com/falabella-cl/search?Ntt=refrigerador" },
+  { "name": "Lavadora",      "url": "https://www.falabella.com/falabella-cl/search?Ntt=lavadora" },
+  { "name": "Microondas",    "url": "https://www.falabella.com/falabella-cl/search?Ntt=microondas" },
+  { "name": "Muebles",       "url": "https://www.falabella.com/falabella-cl/search?Ntt=sofa" },
+  { "name": "Ropa Hombre",   "url": "https://www.falabella.com/falabella-cl/search?Ntt=ropa+hombre" },
+  { "name": "Ropa Mujer",    "url": "https://www.falabella.com/falabella-cl/search?Ntt=ropa+mujer" },
+  { "name": "Zapatillas",    "url": "https://www.falabella.com/falabella-cl/search?Ntt=zapatillas" },
+  { "name": "Deportes",      "url": "https://www.falabella.com/falabella-cl/search?Ntt=deporte" },
+  { "name": "Juguetes",      "url": "https://www.falabella.com/falabella-cl/search?Ntt=juguetes" },
+  { "name": "Perfumes",      "url": "https://www.falabella.com/falabella-cl/search?Ntt=perfume" }
+]

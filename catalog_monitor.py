@@ -1,0 +1,203 @@
+"""
+Monitor de catálogo — Ripley Chile + Falabella Chile.
+- Descuento >= 70%: alerta POSIBLE ERROR DE PRECIO
+- Precio < $1.000 con normal > $5.000: alerta ERROR EXTREMO
+
+Uso:
+    python catalog_monitor.py                 # Monitoreo continuo
+    python catalog_monitor.py --once          # Escanear ahora una vez
+    python catalog_monitor.py --once --debug  # Con detalle del scraping
+    python catalog_monitor.py --store ripley  # Solo Ripley
+    python catalog_monitor.py --store falabella  # Solo Falabella
+"""
+
+import argparse
+import concurrent.futures
+import json
+import logging
+import os
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import schedule
+from dotenv import load_dotenv
+
+import catalog_scraper
+import easy_scraper
+import falabella_scraper
+import paris_scraper
+import sodimac_scraper
+from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
+from storage import clear_old_notifications, has_been_notified, init_db, mark_notified
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).parent
+CATEGORIES_FILE = BASE_DIR / "categories.json"
+FALABELLA_CATEGORIES_FILE = BASE_DIR / "falabella_categories.json"
+PARIS_CATEGORIES_FILE = BASE_DIR / "paris_categories.json"
+EASY_CATEGORIES_FILE = BASE_DIR / "easy_categories.json"
+SODIMAC_CATEGORIES_FILE = BASE_DIR / "sodimac_categories.json"
+LOG_FILE = BASE_DIR / "monitor.log"
+CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
+MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
+PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "70"))
+
+
+def setup_logging(debug: bool = False):
+    level = logging.DEBUG if debug else logging.INFO
+    handlers = [logging.FileHandler(LOG_FILE, encoding="utf-8")]
+    if sys.stdout:
+        handlers.append(logging.StreamHandler(sys.stdout))
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=handlers,
+    )
+
+
+def load_json(path: Path) -> list[dict]:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def scan_store(categories: list[dict], scraper_module, store_name: str, min_discount: float, debug: bool) -> tuple[int, int, int]:
+    """Escanea todas las categorías de una tienda. Retorna (alertas, errores, total_cats)."""
+    total_alerts = 0
+    total_errors = 0
+
+    for cat in categories:
+        logging.info(f">> [{store_name}] {cat['name']}")
+        try:
+            products = scraper_module.scrape_category(
+                url=cat["url"],
+                category_name=cat["name"],
+                min_discount=min_discount,
+                max_pages=3,
+                debug=debug,
+            )
+
+            if not products:
+                logging.info(f"  Sin ofertas >= {min_discount:.0f}%")
+                continue
+
+            logging.info(f"  {len(products)} oferta(s) encontrada(s)")
+            for p in products:
+                tag = "ERROR PRECIO" if p.discount_pct >= PRICE_ERROR_THRESHOLD else "OFERTA"
+                logging.info(f"    [{tag}] {p.name[:55]} | {p.discount_pct:.0f}% | ${p.sale_price:,}")
+
+                if has_been_notified(p.url, p.sale_price):
+                    logging.info(f"      (ya notificado)")
+                    continue
+
+                if p.discount_pct >= PRICE_ERROR_THRESHOLD:
+                    ok = notify_price_error(p)
+                    if ok:
+                        total_errors += 1
+                else:
+                    ok = notify_big_discount(p)
+                    if ok:
+                        total_alerts += 1
+
+                if ok:
+                    mark_notified(p.url, p.name, p.discount_pct, p.sale_price)
+
+            time.sleep(3)
+
+        except Exception as e:
+            logging.error(f"  Error al escanear {cat['name']}: {e}")
+            continue
+
+    return total_alerts, total_errors, len(categories)
+
+
+def run_catalog_scan(
+    min_discount: float = MIN_DISCOUNT,
+    only_store: str | None = None,
+    debug: bool = False,
+):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    logging.info(f"{'='*60}")
+    logging.info(f"Escaneo iniciado {ts} | descuento >= {min_discount:.0f}% | PARALELO")
+    logging.info(f"{'='*60}")
+
+    stores_to_run: list[tuple] = []
+    if only_store is None or only_store.lower() == "ripley":
+        stores_to_run.append((load_json(CATEGORIES_FILE), catalog_scraper, "Ripley"))
+    if only_store is None or only_store.lower() == "falabella":
+        stores_to_run.append((load_json(FALABELLA_CATEGORIES_FILE), falabella_scraper, "Falabella"))
+    if only_store is None or only_store.lower() == "paris":
+        stores_to_run.append((load_json(PARIS_CATEGORIES_FILE), paris_scraper, "Paris"))
+    if only_store is None or only_store.lower() == "easy":
+        stores_to_run.append((load_json(EASY_CATEGORIES_FILE), easy_scraper, "Easy"))
+    if only_store is None or only_store.lower() == "sodimac":
+        stores_to_run.append((load_json(SODIMAC_CATEGORIES_FILE), sodimac_scraper, "Sodimac"))
+
+    logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
+
+    total_alerts = 0
+    total_errors = 0
+    total_cats = 0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(stores_to_run)) as executor:
+        future_to_store = {
+            executor.submit(scan_store, cats, module, name, min_discount, debug): name
+            for cats, module, name in stores_to_run
+        }
+        for future in concurrent.futures.as_completed(future_to_store):
+            store_name = future_to_store[future]
+            try:
+                a, e, n = future.result()
+                total_alerts += a
+                total_errors += e
+                total_cats += n
+                logging.info(f"[{store_name}] TERMINADO — ofertas: {a} | errores precio: {e} | categorías: {n}")
+            except Exception as exc:
+                logging.error(f"[{store_name}] Fallo crítico: {exc}")
+
+    logging.info(f"{'='*60}")
+    logging.info(f"Escaneo completado — Ofertas: {total_alerts} | Errores precio: {total_errors}")
+    logging.info(f"{'='*60}")
+
+    clear_old_notifications(days=7)
+
+    if total_alerts + total_errors > 0:
+        notify_catalog_summary(total_alerts, total_cats, total_errors)
+
+
+def main():
+    if sys.stdout and hasattr(sys.stdout, "reconfigure") and sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+    parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
+    parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
+    parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac"], help="Solo esta tienda")
+    args = parser.parse_args()
+
+    setup_logging(debug=args.debug)
+    init_db()
+
+    if args.once:
+        run_catalog_scan(only_store=args.store, debug=args.debug)
+        sys.exit(0)
+
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | tiendas: Ripley + Falabella + Paris + Easy + Sodimac")
+
+    run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
+
+    schedule.every(CATALOG_INTERVAL_HOURS).hours.do(run_catalog_scan, debug=args.debug)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,24 @@
+# Datos sensibles
+.env
+
+# Base de datos local
+prices.db
+
+# Logs
+monitor.log
+
+# Archivos temporales de desarrollo
+__pycache__/
+*.pyc
+*.pyo
+*.html
+*.json.bak
+paris_products_*.json
+sodimac_product.json
+products.json
+falabella_home.html
+falabella_tecno.html
+
+# Python
+.venv/
+venv/
