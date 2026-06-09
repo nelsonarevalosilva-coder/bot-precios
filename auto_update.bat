@@ -1,15 +1,15 @@
 @echo off
-cd /d "C:\Users\Nelson Arévalo\bot-precios"
+cd /d "%~dp0"
 
-git fetch origin main 2>nul
-git diff --quiet HEAD origin/main 2>nul
+git fetch origin main >nul 2>&1
+git diff --quiet HEAD origin/main >nul 2>&1
 if %errorlevel% == 1 (
     echo Actualizacion disponible, aplicando...
     git pull origin main
     taskkill /f /im python.exe >nul 2>&1
-    timeout /t 3 /nobreak >nul
-    start /min python catalog_monitor.py
-    echo Bot reiniciado con nueva version.
+    timeout /t 5 /nobreak >nul
+    start /min cmd /c "cd /d "%~dp0" && python catalog_monitor.py"
+    echo Bot reiniciado.
 ) else (
-    echo Sin cambios.
+    echo Sin cambios nuevos.
 )
