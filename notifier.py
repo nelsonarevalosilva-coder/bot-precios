@@ -33,6 +33,7 @@ STORE_CHANNEL = {
     "Columbia":             "outdoor",
     "Doite":                "outdoor",
     "Wild Lama":            "outdoor",
+    "El Mundo del Vino":   "licores",
     "Hush Puppies":         "zapatillas",
 }
 

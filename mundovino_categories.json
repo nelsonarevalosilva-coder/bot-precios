@@ -1,0 +1,7 @@
+[
+  { "name": "Ofertas",  "url": "https://www.elmundodelvino.cl/collections/ofertas" },
+  { "name": "Vinos",    "url": "https://www.elmundodelvino.cl/collections/vinos" },
+  { "name": "Whisky",   "url": "https://www.elmundodelvino.cl/collections/whisky" },
+  { "name": "Pisco",    "url": "https://www.elmundodelvino.cl/collections/pisco" },
+  { "name": "Ron",      "url": "https://www.elmundodelvino.cl/collections/ron" }
+]
