@@ -6,6 +6,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # canal principal / fallback
+PRICE_ERROR_CHANNEL = -1004295138538     # canal especial errores de precio extremo
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -31,6 +32,7 @@ STORE_CHANNEL = {
     "Multimarcas Perfumes": "perfumes",
     "Columbia":             "outdoor",
     "Doite":                "outdoor",
+    "Wild Lama":            "outdoor",
     "Hush Puppies":         "zapatillas",
 }
 
@@ -186,6 +188,11 @@ def notify_price_error(product) -> bool:
             f"⚠️ <i>Precio probablemente incorrecto — compra ahora antes de que lo corrijan</i>\n"
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
+        ok = _send(text, chat_id=channel)
+        _send(text, chat_id=PRICE_ERROR_CHANNEL)  # también al canal especial
+        if ok:
+            print(f"  → ERROR EXTREMO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + especial")
+        return ok
     else:
         text = (
             f"🚨 <b>POSIBLE ERROR DE PRECIO en {store}</b>\n\n"

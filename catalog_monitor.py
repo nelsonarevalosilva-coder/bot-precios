@@ -38,6 +38,7 @@ import paris_scraper
 import reebok_scraper
 import pcfactory_scraper
 import sodimac_scraper
+import wildlama_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
 from storage import clear_old_notifications, has_been_notified, init_db, mark_notified
 
@@ -58,6 +59,7 @@ PCFACTORY_CATEGORIES_FILE = BASE_DIR / "pcfactory_categories.json"
 MULTIMARCAS_CATEGORIES_FILE = BASE_DIR / "multimarcas_categories.json"
 REEBOK_CATEGORIES_FILE = BASE_DIR / "reebok_categories.json"
 BOLD_CATEGORIES_FILE = BASE_DIR / "bold_categories.json"
+WILDLAMA_CATEGORIES_FILE = BASE_DIR / "wildlama_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
@@ -171,6 +173,8 @@ def run_catalog_scan(
         stores_to_run.append((load_json(REEBOK_CATEGORIES_FILE), reebok_scraper, "Reebok"))
     if only_store is None or only_store.lower() == "bold":
         stores_to_run.append((load_json(BOLD_CATEGORIES_FILE), bold_scraper, "Bold"))
+    if only_store is None or only_store.lower() == "wildlama":
+        stores_to_run.append((load_json(WILDLAMA_CATEGORIES_FILE), wildlama_scraper, "Wild Lama"))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -213,7 +217,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
