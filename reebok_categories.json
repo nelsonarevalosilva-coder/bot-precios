@@ -1,0 +1,6 @@
+[
+  { "name": "Outlet",     "url": "https://www.reebok.cl/search?ft=outlet" },
+  { "name": "Zapatillas", "url": "https://www.reebok.cl/search?ft=zapatillas" },
+  { "name": "Ropa",       "url": "https://www.reebok.cl/search?ft=ropa" },
+  { "name": "Accesorios", "url": "https://www.reebok.cl/search?ft=accesorios" }
+]

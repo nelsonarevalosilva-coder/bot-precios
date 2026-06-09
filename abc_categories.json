@@ -1,0 +1,14 @@
+[
+  { "name": "Televisores",      "url": "https://www.abc.cl/search?q=televisor" },
+  { "name": "Computadores",     "url": "https://www.abc.cl/search?q=notebook" },
+  { "name": "Celulares",        "url": "https://www.abc.cl/search?q=celular" },
+  { "name": "Audio",            "url": "https://www.abc.cl/search?q=audifonos" },
+  { "name": "Tablets",          "url": "https://www.abc.cl/search?q=tablet" },
+  { "name": "Refrigeradores",   "url": "https://www.abc.cl/search?q=refrigerador" },
+  { "name": "Lavadoras",        "url": "https://www.abc.cl/search?q=lavadora" },
+  { "name": "Microondas",       "url": "https://www.abc.cl/search?q=microondas" },
+  { "name": "Muebles",          "url": "https://www.abc.cl/search?q=sofa" },
+  { "name": "Ropa",             "url": "https://www.abc.cl/search?q=ropa" },
+  { "name": "Calzado",          "url": "https://www.abc.cl/search?q=zapato" },
+  { "name": "Juguetes",         "url": "https://www.abc.cl/search?q=juguete" }
+]

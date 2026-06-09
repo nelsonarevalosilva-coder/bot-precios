@@ -1,0 +1,12 @@
+[
+  { "name": "Televisores",      "url": "https://www.jumbo.cl/search?query=televisor" },
+  { "name": "Audio",            "url": "https://www.jumbo.cl/search?query=audifonos" },
+  { "name": "Celulares",        "url": "https://www.jumbo.cl/search?query=celular" },
+  { "name": "Computadores",     "url": "https://www.jumbo.cl/search?query=notebook" },
+  { "name": "Electrodomésticos","url": "https://www.jumbo.cl/search?query=refrigerador" },
+  { "name": "Lavadoras",        "url": "https://www.jumbo.cl/search?query=lavadora" },
+  { "name": "Juguetes",         "url": "https://www.jumbo.cl/search?query=juguete" },
+  { "name": "Herramientas",     "url": "https://www.jumbo.cl/search?query=taladro" },
+  { "name": "Jardín",           "url": "https://www.jumbo.cl/search?query=jardin" },
+  { "name": "Hogar",            "url": "https://www.jumbo.cl/search?query=silla" }
+]

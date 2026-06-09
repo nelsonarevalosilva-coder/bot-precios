@@ -1,0 +1,6 @@
+[
+  { "name": "Sale",      "url": "https://www.bold.cl/sale?category=sale-bold" },
+  { "name": "Hombre",    "url": "https://www.bold.cl/hombre?category=hombre" },
+  { "name": "Mujer",     "url": "https://www.bold.cl/mujer?category=mujer" },
+  { "name": "Zapatillas","url": "https://www.bold.cl/zapatillas?category=zapatillas" }
+]
