@@ -5,18 +5,134 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # canal principal / fallback
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
+# IDs de los 12 canales por categoría
+CHANNEL_IDS = {
+    "tecnologia":    -1003633911277,
+    "muebles_hogar": -1003804002653,
+    "electro":       -1003911147571,
+    "perfumes":      -1003980648018,
+    "gaming":        -1004290755569,
+    "zapatillas":    -1003900467811,
+    "outdoor":       -1003907913373,
+    "deportes":      -1003998383372,
+    "ropa":          -1003932337515,
+    "automotriz":    -1003962932016,
+    "ferreteria":    -1003848024596,
+    "licores":       -1004053668233,
+}
 
-def _send(text: str) -> bool:
+# Tiendas que siempre van a un canal específico
+STORE_CHANNEL = {
+    "PC Factory":           "tecnologia",
+    "Multimarcas Perfumes": "perfumes",
+    "Columbia":             "outdoor",
+    "Doite":                "outdoor",
+    "Hush Puppies":         "zapatillas",
+}
+
+# Keywords de categoría → canal (el primer match gana)
+CATEGORY_KEYWORDS = [
+    ("zapatilla",       "zapatillas"),
+    ("zapatos",         "zapatillas"),
+    ("calzado",         "zapatillas"),
+    ("consola",         "gaming"),
+    ("gaming",          "gaming"),
+    ("electrodom",      "electro"),
+    ("refriger",        "electro"),
+    ("lavadora",        "electro"),
+    ("microondas",      "electro"),
+    ("electro",         "electro"),
+    ("televisi",        "tecnologia"),
+    ("television",      "tecnologia"),
+    ("televisor",       "tecnologia"),
+    ("computador",      "tecnologia"),
+    ("celular",         "tecnologia"),
+    ("smartphone",      "tecnologia"),
+    ("notebook",        "tecnologia"),
+    ("monitor",         "tecnologia"),
+    ("tablet",          "tecnologia"),
+    ("audio",           "tecnologia"),
+    ("tecno",           "tecnologia"),
+    ("almacenamiento",  "tecnologia"),
+    ("memorias",        "tecnologia"),
+    ("impresora",       "tecnologia"),
+    ("componente",      "tecnologia"),
+    ("perfume",         "perfumes"),
+    ("belleza",         "perfumes"),
+    ("deporte",         "deportes"),
+    ("ferreteria",      "ferreteria"),
+    ("ferretería",      "ferreteria"),
+    ("herramienta",     "ferreteria"),
+    ("electricidad",    "ferreteria"),
+    ("jardín",          "ferreteria"),
+    ("jardin",          "ferreteria"),
+    ("pintura",         "ferreteria"),
+    ("plomería",        "ferreteria"),
+    ("plomeria",        "ferreteria"),
+    ("climatizaci",     "ferreteria"),
+    ("seguridad",       "ferreteria"),
+    ("mueble",          "muebles_hogar"),
+    ("dormitorio",      "muebles_hogar"),
+    ("baño",            "muebles_hogar"),
+    ("bano",            "muebles_hogar"),
+    ("cocina",          "muebles_hogar"),
+    ("decoraci",        "muebles_hogar"),
+    ("iluminaci",       "muebles_hogar"),
+    ("hogar",           "muebles_hogar"),
+    ("ropa",            "ropa"),
+    ("moda",            "ropa"),
+    ("hombre",          "ropa"),
+    ("mujer",           "ropa"),
+    ("automotriz",      "automotriz"),
+    ("licor",           "licores"),
+    ("vino",            "licores"),
+    ("cerveza",         "licores"),
+    ("whisky",          "licores"),
+]
+
+
+def get_channel_for_product(product) -> int:
+    """Retorna el chat_id del canal correcto para el producto."""
+    store = getattr(product, "store", "")
+    category = getattr(product, "category", "").lower()
+
+    # 1. Override por tienda
+    if store in STORE_CHANNEL:
+        return CHANNEL_IDS[STORE_CHANNEL[store]]
+
+    # 2. Reebok: por categoría
+    if store == "Reebok":
+        if "zapatilla" in category:
+            return CHANNEL_IDS["zapatillas"]
+        return CHANNEL_IDS["deportes"]
+
+    # 3. Bold: por categoría
+    if store == "Bold":
+        if "zapatilla" in category:
+            return CHANNEL_IDS["zapatillas"]
+        return CHANNEL_IDS["ropa"]
+
+    # 4. Keyword de categoría
+    for keyword, channel_key in CATEGORY_KEYWORDS:
+        if keyword in category:
+            return CHANNEL_IDS[channel_key]
+
+    # 5. Fallback: canal principal
+    return int(CHAT_ID)
+
+
+def _send(text: str, chat_id=None) -> bool:
     if not BOT_TOKEN or not CHAT_ID:
         print("[notifier] TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados.")
         return False
+    target = chat_id if chat_id is not None else int(CHAT_ID)
     resp = requests.post(
         f"{TELEGRAM_API}/sendMessage",
-        json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"},
+        json={"chat_id": target, "text": text, "parse_mode": "HTML"},
         timeout=10,
     )
     return resp.status_code == 200
@@ -57,6 +173,7 @@ def notify_price_error(product) -> bool:
     """Alerta especial para posibles errores de precio (>= 70% descuento)."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
+    channel = get_channel_for_product(product)
 
     if product.sale_price < 1000 and product.normal_price > 5000:
         text = (
@@ -80,18 +197,19 @@ def notify_price_error(product) -> bool:
             f"⚡ <i>Compra antes de que lo corrijan</i>\n"
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
-    ok = _send(text)
+    ok = _send(text, chat_id=channel)
     if ok:
-        print(f"  → ERROR PRECIO enviado: {product.name} ({product.discount_pct:.0f}% off)")
+        print(f"  → ERROR PRECIO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel}")
     return ok
 
 
 def notify_big_discount(product) -> bool:
-    """Alerta de descuento >= 50% (pero < 70%) encontrado en el catálogo."""
+    """Alerta de descuento >= 40% encontrado en el catálogo."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
+    channel = get_channel_for_product(product)
     text = (
-        f"🔥 <b>OFERTA +70% DESCUENTO en {store}</b>\n\n"
+        f"🔥 <b>OFERTA {product.discount_pct:.0f}% DESCUENTO en {store}</b>\n\n"
         f"📦 <b>{product.name}</b>\n"
         f"🏷️ Categoría: {product.category}\n"
         f"💰 Precio normal: <s>${product.normal_price:,}</s>\n"
@@ -99,19 +217,19 @@ def notify_big_discount(product) -> bool:
         f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> (ahorras ${savings:,})\n\n"
         f"🔗 <a href=\"{product.url}\">Ver oferta</a>"
     )
-    ok = _send(text)
+    ok = _send(text, chat_id=channel)
     if ok:
-        print(f"  → Alerta enviada: {product.name} ({product.discount_pct:.0f}% off)")
+        print(f"  → Alerta enviada: {product.name} ({product.discount_pct:.0f}% off) → canal {channel}")
     return ok
 
 
 def notify_catalog_summary(total_found: int, categories_scanned: int, errors_found: int = 0):
-    """Resumen del escaneo del catálogo."""
+    """Resumen del escaneo — va al canal principal."""
     error_line = f"\n🚨 Errores de precio (+70%): <b>{errors_found}</b>" if errors_found > 0 else ""
     text = (
-        f"✅ <b>Escaneo Ripley + Falabella + Paris + Easy + Sodimac completado</b>\n"
+        f"✅ <b>Escaneo completado — 14 tiendas</b>\n"
         f"📂 Categorías revisadas: {categories_scanned}\n"
-        f"🔥 Ofertas encontradas: {total_found}"
+        f"🔥 Ofertas enviadas: {total_found}"
         f"{error_line}"
     )
     _send(text)
