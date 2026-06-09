@@ -174,11 +174,24 @@ def notify_target_reached(product_name: str, url: str, price: int, target: int):
         print(f"[notifier] Alerta objetivo enviada: {product_name} en ${price:,}")
 
 
-def notify_price_error(product) -> bool:
+def _min_price_line(sale_price: int, min_price: int | None) -> str:
+    """Genera la línea de mínimo histórico para incluir en el mensaje."""
+    if min_price is None:
+        return "\n📊 <i>Primera vez registrado en el sistema</i>"
+    if sale_price < min_price:
+        return f"\n🟢 <b>¡Mínimo histórico!</b> Antes lo más barato era <s>${min_price:,}</s>"
+    if sale_price == min_price:
+        return f"\n📊 Mínimo histórico: <b>${min_price:,}</b> (igual al más barato registrado)"
+    diff_pct = (sale_price - min_price) / min_price * 100
+    return f"\n📊 Mínimo histórico: <b>${min_price:,}</b> ({diff_pct:.0f}% más caro que el menor precio registrado)"
+
+
+def notify_price_error(product, min_price: int | None = None) -> bool:
     """Alerta especial para posibles errores de precio (>= 70% descuento)."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
     channel = get_channel_for_product(product)
+    hist = _min_price_line(product.sale_price, min_price)
 
     if product.sale_price < 1000 and product.normal_price > 5000:
         text = (
@@ -187,12 +200,13 @@ def notify_price_error(product) -> bool:
             f"🏷️ Categoría: {product.category}\n"
             f"💰 Precio normal: <s>${product.normal_price:,}</s>\n"
             f"🔴 Precio actual: <b>${product.sale_price:,}</b>\n"
-            f"📉 Descuento: <b>{product.discount_pct:.0f}%</b>\n\n"
+            f"📉 Descuento: <b>{product.discount_pct:.0f}%</b>"
+            f"{hist}\n\n"
             f"⚠️ <i>Precio probablemente incorrecto — compra ahora antes de que lo corrijan</i>\n"
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
         ok = _send(text, chat_id=channel)
-        _send(text, chat_id=PRICE_ERROR_CHANNEL)  # también al canal especial
+        _send(text, chat_id=PRICE_ERROR_CHANNEL)
         if ok:
             print(f"  → ERROR EXTREMO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + especial")
         return ok
@@ -203,7 +217,8 @@ def notify_price_error(product) -> bool:
             f"🏷️ Categoría: {product.category}\n"
             f"💰 Precio normal: <s>${product.normal_price:,}</s>\n"
             f"🔴 Precio actual: <b>${product.sale_price:,}</b>\n"
-            f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> — ahorras ${savings:,}\n\n"
+            f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> — ahorras ${savings:,}"
+            f"{hist}\n\n"
             f"⚡ <i>Compra antes de que lo corrijan</i>\n"
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
@@ -213,18 +228,20 @@ def notify_price_error(product) -> bool:
     return ok
 
 
-def notify_big_discount(product) -> bool:
-    """Alerta de descuento >= 40% encontrado en el catálogo."""
+def notify_big_discount(product, min_price: int | None = None) -> bool:
+    """Alerta de descuento encontrado en el catálogo."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
     channel = get_channel_for_product(product)
+    hist = _min_price_line(product.sale_price, min_price)
     text = (
         f"🔥 <b>OFERTA {product.discount_pct:.0f}% DESCUENTO en {store}</b>\n\n"
         f"📦 <b>{product.name}</b>\n"
         f"🏷️ Categoría: {product.category}\n"
         f"💰 Precio normal: <s>${product.normal_price:,}</s>\n"
         f"✅ Precio oferta: <b>${product.sale_price:,}</b>\n"
-        f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> (ahorras ${savings:,})\n\n"
+        f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> (ahorras ${savings:,})"
+        f"{hist}\n\n"
         f"🔗 <a href=\"{product.url}\">Ver oferta</a>"
     )
     ok = _send(text, chat_id=channel)

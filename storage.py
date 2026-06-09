@@ -82,6 +82,16 @@ def save_price(product_name: str, url: str, price: int):
         conn.commit()
 
 
+def get_min_price(url: str) -> int | None:
+    """Retorna el precio mínimo histórico registrado para este producto, o None si es la primera vez."""
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT MIN(price) FROM price_history WHERE url = ?",
+            (url,),
+        ).fetchone()
+    return row[0] if row and row[0] is not None else None
+
+
 def get_price_history(url: str, limit: int = 10) -> list[dict]:
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute(
