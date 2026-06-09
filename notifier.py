@@ -34,6 +34,8 @@ STORE_CHANNEL = {
     "Doite":                "outdoor",
     "Wild Lama":            "outdoor",
     "El Mundo del Vino":   "licores",
+    "Liquidos":            "licores",
+    "Booz":               "licores",
     "Hush Puppies":         "zapatillas",
 }
 
@@ -235,7 +237,7 @@ def notify_catalog_summary(total_found: int, categories_scanned: int, errors_fou
     """Resumen del escaneo — va al canal principal."""
     error_line = f"\n🚨 Errores de precio (+70%): <b>{errors_found}</b>" if errors_found > 0 else ""
     text = (
-        f"✅ <b>Escaneo completado — 14 tiendas</b>\n"
+        f"✅ <b>Escaneo completado — 18 tiendas</b>\n"
         f"📂 Categorías revisadas: {categories_scanned}\n"
         f"🔥 Ofertas enviadas: {total_found}"
         f"{error_line}"

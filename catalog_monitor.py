@@ -40,6 +40,8 @@ import pcfactory_scraper
 import sodimac_scraper
 import wildlama_scraper
 import mundovino_scraper
+import liquidos_scraper
+import booz_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
 from storage import clear_old_notifications, has_been_notified, init_db, mark_notified
 
@@ -62,10 +64,14 @@ REEBOK_CATEGORIES_FILE = BASE_DIR / "reebok_categories.json"
 BOLD_CATEGORIES_FILE = BASE_DIR / "bold_categories.json"
 WILDLAMA_CATEGORIES_FILE = BASE_DIR / "wildlama_categories.json"
 MUNDOVINO_CATEGORIES_FILE = BASE_DIR / "mundovino_categories.json"
+LIQUIDOS_CATEGORIES_FILE = BASE_DIR / "liquidos_categories.json"
+BOOZ_CATEGORIES_FILE = BASE_DIR / "booz_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
 PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "70"))
+LICORES_MIN_DISCOUNT = 30.0  # umbral especial para tiendas de licores
+LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz"}
 
 
 def setup_logging(debug: bool = False):
@@ -146,39 +152,46 @@ def run_catalog_scan(
     logging.info(f"Escaneo iniciado {ts} | descuento >= {min_discount:.0f}% | PARALELO")
     logging.info(f"{'='*60}")
 
+    def _store_discount(store_name: str) -> float:
+        return LICORES_MIN_DISCOUNT if store_name in LICORES_STORES else min_discount
+
     stores_to_run: list[tuple] = []
     if only_store is None or only_store.lower() == "ripley":
-        stores_to_run.append((load_json(CATEGORIES_FILE), catalog_scraper, "Ripley"))
+        stores_to_run.append((load_json(CATEGORIES_FILE), catalog_scraper, "Ripley", _store_discount("Ripley")))
     if only_store is None or only_store.lower() == "falabella":
-        stores_to_run.append((load_json(FALABELLA_CATEGORIES_FILE), falabella_scraper, "Falabella"))
+        stores_to_run.append((load_json(FALABELLA_CATEGORIES_FILE), falabella_scraper, "Falabella", _store_discount("Falabella")))
     if only_store is None or only_store.lower() == "paris":
-        stores_to_run.append((load_json(PARIS_CATEGORIES_FILE), paris_scraper, "Paris"))
+        stores_to_run.append((load_json(PARIS_CATEGORIES_FILE), paris_scraper, "Paris", _store_discount("Paris")))
     if only_store is None or only_store.lower() == "easy":
-        stores_to_run.append((load_json(EASY_CATEGORIES_FILE), easy_scraper, "Easy"))
+        stores_to_run.append((load_json(EASY_CATEGORIES_FILE), easy_scraper, "Easy", _store_discount("Easy")))
     if only_store is None or only_store.lower() == "sodimac":
-        stores_to_run.append((load_json(SODIMAC_CATEGORIES_FILE), sodimac_scraper, "Sodimac"))
+        stores_to_run.append((load_json(SODIMAC_CATEGORIES_FILE), sodimac_scraper, "Sodimac", _store_discount("Sodimac")))
     if only_store is None or only_store.lower() == "jumbo":
-        stores_to_run.append((load_json(JUMBO_CATEGORIES_FILE), jumbo_scraper, "Jumbo"))
+        stores_to_run.append((load_json(JUMBO_CATEGORIES_FILE), jumbo_scraper, "Jumbo", _store_discount("Jumbo")))
     if only_store is None or only_store.lower() == "abc":
-        stores_to_run.append((load_json(ABC_CATEGORIES_FILE), abc_scraper, "abc"))
+        stores_to_run.append((load_json(ABC_CATEGORIES_FILE), abc_scraper, "abc", _store_discount("abc")))
     if only_store is None or only_store.lower() == "columbia":
-        stores_to_run.append((load_json(COLUMBIA_CATEGORIES_FILE), columbia_scraper, "Columbia"))
+        stores_to_run.append((load_json(COLUMBIA_CATEGORIES_FILE), columbia_scraper, "Columbia", _store_discount("Columbia")))
     if only_store is None or only_store.lower() == "doite":
-        stores_to_run.append((load_json(DOITE_CATEGORIES_FILE), doite_scraper, "Doite"))
+        stores_to_run.append((load_json(DOITE_CATEGORIES_FILE), doite_scraper, "Doite", _store_discount("Doite")))
     if only_store is None or only_store.lower() == "hushpuppies":
-        stores_to_run.append((load_json(HUSHPUPPIES_CATEGORIES_FILE), hushpuppies_scraper, "Hush Puppies"))
+        stores_to_run.append((load_json(HUSHPUPPIES_CATEGORIES_FILE), hushpuppies_scraper, "Hush Puppies", _store_discount("Hush Puppies")))
     if only_store is None or only_store.lower() == "pcfactory":
-        stores_to_run.append((load_json(PCFACTORY_CATEGORIES_FILE), pcfactory_scraper, "PC Factory"))
+        stores_to_run.append((load_json(PCFACTORY_CATEGORIES_FILE), pcfactory_scraper, "PC Factory", _store_discount("PC Factory")))
     if only_store is None or only_store.lower() == "multimarcas":
-        stores_to_run.append((load_json(MULTIMARCAS_CATEGORIES_FILE), multimarcas_scraper, "Multimarcas Perfumes"))
+        stores_to_run.append((load_json(MULTIMARCAS_CATEGORIES_FILE), multimarcas_scraper, "Multimarcas Perfumes", _store_discount("Multimarcas Perfumes")))
     if only_store is None or only_store.lower() == "reebok":
-        stores_to_run.append((load_json(REEBOK_CATEGORIES_FILE), reebok_scraper, "Reebok"))
+        stores_to_run.append((load_json(REEBOK_CATEGORIES_FILE), reebok_scraper, "Reebok", _store_discount("Reebok")))
     if only_store is None or only_store.lower() == "bold":
-        stores_to_run.append((load_json(BOLD_CATEGORIES_FILE), bold_scraper, "Bold"))
+        stores_to_run.append((load_json(BOLD_CATEGORIES_FILE), bold_scraper, "Bold", _store_discount("Bold")))
     if only_store is None or only_store.lower() == "wildlama":
-        stores_to_run.append((load_json(WILDLAMA_CATEGORIES_FILE), wildlama_scraper, "Wild Lama"))
+        stores_to_run.append((load_json(WILDLAMA_CATEGORIES_FILE), wildlama_scraper, "Wild Lama", _store_discount("Wild Lama")))
     if only_store is None or only_store.lower() == "mundovino":
-        stores_to_run.append((load_json(MUNDOVINO_CATEGORIES_FILE), mundovino_scraper, "El Mundo del Vino"))
+        stores_to_run.append((load_json(MUNDOVINO_CATEGORIES_FILE), mundovino_scraper, "El Mundo del Vino", _store_discount("El Mundo del Vino")))
+    if only_store is None or only_store.lower() == "liquidos":
+        stores_to_run.append((load_json(LIQUIDOS_CATEGORIES_FILE), liquidos_scraper, "Liquidos", _store_discount("Liquidos")))
+    if only_store is None or only_store.lower() == "booz":
+        stores_to_run.append((load_json(BOOZ_CATEGORIES_FILE), booz_scraper, "Booz", _store_discount("Booz")))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -188,8 +201,8 @@ def run_catalog_scan(
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(stores_to_run)) as executor:
         future_to_store = {
-            executor.submit(scan_store, cats, module, name, min_discount, debug): name
-            for cats, module, name in stores_to_run
+            executor.submit(scan_store, cats, module, name, store_discount, debug): name
+            for cats, module, name, store_discount in stores_to_run
         }
         for future in concurrent.futures.as_completed(future_to_store):
             store_name = future_to_store[future]
@@ -221,7 +234,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
@@ -231,7 +244,7 @@ def main():
         run_catalog_scan(only_store=args.store, debug=args.debug)
         sys.exit(0)
 
-    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | tiendas: Ripley + Falabella + Paris + Easy + Sodimac + Jumbo + abc + Columbia + Doite + Hush Puppies + PC Factory")
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% (licores >= {LICORES_MIN_DISCOUNT:.0f}%) | 18 tiendas")
 
     run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
 

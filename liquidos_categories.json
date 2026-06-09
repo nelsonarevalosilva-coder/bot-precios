@@ -1,0 +1,12 @@
+[
+  { "name": "Whisky",    "url": "https://www.liquidos.cl/categoria/whisky" },
+  { "name": "Vino",      "url": "https://www.liquidos.cl/categoria/vino" },
+  { "name": "Cerveza",   "url": "https://www.liquidos.cl/categoria/cerveza" },
+  { "name": "Pisco",     "url": "https://www.liquidos.cl/categoria/pisco" },
+  { "name": "Ron",       "url": "https://www.liquidos.cl/categoria/ron" },
+  { "name": "Vodka",     "url": "https://www.liquidos.cl/categoria/vodka" },
+  { "name": "Gin",       "url": "https://www.liquidos.cl/categoria/gin" },
+  { "name": "Tequila",   "url": "https://www.liquidos.cl/categoria/tequila" },
+  { "name": "Espumante", "url": "https://www.liquidos.cl/categoria/espumante" },
+  { "name": "Licor",     "url": "https://www.liquidos.cl/categoria/licor" }
+]

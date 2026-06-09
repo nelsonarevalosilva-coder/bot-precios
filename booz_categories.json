@@ -1,0 +1,9 @@
+[
+  { "name": "Cervezas",      "url": "https://www.booz.cl/catalogo/cervezas" },
+  { "name": "Vinos Tintos",  "url": "https://www.booz.cl/catalogo/vinos-tintos" },
+  { "name": "Vinos Blancos", "url": "https://www.booz.cl/catalogo/vinos-blancos" },
+  { "name": "Whisky",        "url": "https://www.booz.cl/catalogo/especial-de-whisky" },
+  { "name": "Pisco",         "url": "https://www.booz.cl/catalogo/pisco-clasico" },
+  { "name": "Ofertas",       "url": "https://www.booz.cl/catalogo/ofertas-de-la-semana" },
+  { "name": "Liquidacion",   "url": "https://www.booz.cl/catalogo/liquidacion-licores-y-destilados" }
+]
