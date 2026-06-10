@@ -38,6 +38,8 @@ STORE_CHANNEL = {
     "Liquidos":            "licores",
     "Booz":               "licores",
     "Hush Puppies":         "zapatillas",
+    "IKEA":                 "muebles_hogar",
+    "Amoble":               "muebles_hogar",
 }
 
 # Keywords de categoría → canal (el primer match gana)
@@ -278,7 +280,7 @@ def notify_catalog_summary(total_found: int, categories_scanned: int, errors_fou
     """Resumen del escaneo — va al canal principal."""
     error_line = f"\n🚨 Errores de precio (+70%): <b>{errors_found}</b>" if errors_found > 0 else ""
     text = (
-        f"✅ <b>Escaneo completado — 18 tiendas</b>\n"
+        f"✅ <b>Escaneo completado — 20 tiendas</b>\n"
         f"📂 Categorías revisadas: {categories_scanned}\n"
         f"🔥 Ofertas enviadas: {total_found}"
         f"{error_line}"

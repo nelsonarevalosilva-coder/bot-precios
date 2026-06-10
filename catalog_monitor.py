@@ -42,6 +42,8 @@ import wildlama_scraper
 import mundovino_scraper
 import liquidos_scraper
 import booz_scraper
+import ikea_scraper
+import amoble_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
 from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, init_db, mark_notified, save_price
 
@@ -66,6 +68,8 @@ WILDLAMA_CATEGORIES_FILE = BASE_DIR / "wildlama_categories.json"
 MUNDOVINO_CATEGORIES_FILE = BASE_DIR / "mundovino_categories.json"
 LIQUIDOS_CATEGORIES_FILE = BASE_DIR / "liquidos_categories.json"
 BOOZ_CATEGORIES_FILE = BASE_DIR / "booz_categories.json"
+IKEA_CATEGORIES_FILE = BASE_DIR / "ikea_categories.json"
+AMOBLE_CATEGORIES_FILE = BASE_DIR / "amoble_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
@@ -197,6 +201,10 @@ def run_catalog_scan(
         stores_to_run.append((load_json(LIQUIDOS_CATEGORIES_FILE), liquidos_scraper, "Liquidos", _store_discount("Liquidos")))
     if only_store is None or only_store.lower() == "booz":
         stores_to_run.append((load_json(BOOZ_CATEGORIES_FILE), booz_scraper, "Booz", _store_discount("Booz")))
+    if only_store is None or only_store.lower() == "ikea":
+        stores_to_run.append((load_json(IKEA_CATEGORIES_FILE), ikea_scraper, "IKEA", _store_discount("IKEA")))
+    if only_store is None or only_store.lower() == "amoble":
+        stores_to_run.append((load_json(AMOBLE_CATEGORIES_FILE), amoble_scraper, "Amoble", _store_discount("Amoble")))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -239,7 +247,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
@@ -249,7 +257,7 @@ def main():
         run_catalog_scan(only_store=args.store, debug=args.debug)
         sys.exit(0)
 
-    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% (licores >= {LICORES_MIN_DISCOUNT:.0f}%) | 18 tiendas")
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% (licores >= {LICORES_MIN_DISCOUNT:.0f}%) | 20 tiendas")
 
     run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
 
