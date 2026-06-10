@@ -207,8 +207,9 @@ def notify_price_error(product, min_price: int | None = None) -> bool:
         )
         ok = _send(text, chat_id=channel)
         _send(text, chat_id=PRICE_ERROR_CHANNEL)
+        _send(text, chat_id=int(CHAT_ID))
         if ok:
-            print(f"  → ERROR EXTREMO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + especial")
+            print(f"  → ERROR EXTREMO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + especial + principal")
         return ok
     else:
         text = (
@@ -223,8 +224,9 @@ def notify_price_error(product, min_price: int | None = None) -> bool:
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
     ok = _send(text, chat_id=channel)
+    _send(text, chat_id=int(CHAT_ID))
     if ok:
-        print(f"  → ERROR PRECIO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel}")
+        print(f"  → ERROR PRECIO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + principal")
     return ok
 
 
