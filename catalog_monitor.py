@@ -69,7 +69,7 @@ BOOZ_CATEGORIES_FILE = BASE_DIR / "booz_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
-PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "70"))
+PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "80"))
 LICORES_MIN_DISCOUNT = 30.0  # umbral especial para tiendas de licores
 LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz"}
 
