@@ -1,6 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
+from price_checker import compare_prices, format_comparison, should_compare
 
 load_dotenv()
 
@@ -235,6 +236,16 @@ def notify_big_discount(product, min_price: int | None = None) -> bool:
     store = getattr(product, "store", "Ripley")
     channel = get_channel_for_product(product)
     hist = _min_price_line(product.sale_price, min_price)
+
+    # Comparación cross-store solo para electro
+    compare_block = ""
+    if should_compare(product.category):
+        try:
+            results = compare_prices(product.name)
+            compare_block = format_comparison(results, store, product.sale_price)
+        except Exception:
+            pass
+
     text = (
         f"🔥 <b>OFERTA {product.discount_pct:.0f}% DESCUENTO en {store}</b>\n\n"
         f"📦 <b>{product.name}</b>\n"
@@ -242,7 +253,8 @@ def notify_big_discount(product, min_price: int | None = None) -> bool:
         f"💰 Precio normal: <s>${product.normal_price:,}</s>\n"
         f"✅ Precio oferta: <b>${product.sale_price:,}</b>\n"
         f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> (ahorras ${savings:,})"
-        f"{hist}\n\n"
+        f"{hist}"
+        f"{compare_block}\n\n"
         f"🔗 <a href=\"{product.url}\">Ver oferta</a>"
     )
     ok = _send(text, chat_id=channel)
