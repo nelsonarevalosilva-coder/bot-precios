@@ -1,7 +1,7 @@
 import os
 import requests
+from datetime import datetime
 from dotenv import load_dotenv
-from price_checker import compare_prices, format_comparison, should_compare
 
 load_dotenv()
 
@@ -175,24 +175,46 @@ def notify_target_reached(product_name: str, url: str, price: int, target: int):
         print(f"[notifier] Alerta objetivo enviada: {product_name} en ${price:,}")
 
 
-def _min_price_line(sale_price: int, min_price: int | None) -> str:
-    """Genera la línea de mínimo histórico para incluir en el mensaje."""
-    if min_price is None:
-        return "\n📊 <i>Primera vez registrado en el sistema</i>"
-    if sale_price < min_price:
-        return f"\n🟢 <b>¡Mínimo histórico!</b> Antes lo más barato era <s>${min_price:,}</s>"
-    if sale_price == min_price:
-        return f"\n📊 Mínimo histórico: <b>${min_price:,}</b> (igual al más barato registrado)"
-    diff_pct = (sale_price - min_price) / min_price * 100
-    return f"\n📊 Mínimo histórico: <b>${min_price:,}</b> ({diff_pct:.0f}% más caro que el menor precio registrado)"
+_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+
+def _fmt_date(iso: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso)
+        return f"{dt.day} {_MESES[dt.month - 1]}"
+    except Exception:
+        return iso[:10]
 
 
-def notify_price_error(product, min_price: int | None = None) -> bool:
-    """Alerta especial para posibles errores de precio (>= 70% descuento)."""
+def _history_block(sale_price: int, min_data: tuple | None, last_prices: list) -> str:
+    """Genera el bloque de historial de precios."""
+    lines = []
+
+    if min_data is None:
+        lines.append("📊 <i>Primera vez registrado</i>")
+    else:
+        min_price, min_date = min_data
+        date_str = _fmt_date(min_date)
+        if sale_price < min_price:
+            lines.append(f"🟢 <b>¡Nuevo mínimo histórico!</b> Antes: <s>${min_price:,}</s> ({date_str})")
+        elif sale_price == min_price:
+            lines.append(f"📊 Mínimo histórico: <b>${min_price:,}</b> ({date_str})")
+        else:
+            diff_pct = (sale_price - min_price) / min_price * 100
+            lines.append(f"📊 Mínimo histórico: <b>${min_price:,}</b> ({date_str}) — actual es {diff_pct:.0f}% más caro")
+
+    if last_prices:
+        entries = " → ".join(f"${p:,} ({_fmt_date(d)})" for p, d in reversed(last_prices))
+        lines.append(f"🕐 Últimos precios: {entries}")
+
+    return "\n" + "\n".join(lines)
+
+
+def notify_price_error(product, min_data=None, last_prices=None) -> bool:
+    """Alerta especial para posibles errores de precio (>= 80% descuento)."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
     channel = get_channel_for_product(product)
-    hist = _min_price_line(product.sale_price, min_price)
+    hist = _history_block(product.sale_price, min_data, last_prices or [])
 
     if product.sale_price < 1000 and product.normal_price > 5000:
         text = (
@@ -230,22 +252,12 @@ def notify_price_error(product, min_price: int | None = None) -> bool:
     return ok
 
 
-def notify_big_discount(product, min_price: int | None = None) -> bool:
+def notify_big_discount(product, min_data=None, last_prices=None) -> bool:
     """Alerta de descuento encontrado en el catálogo."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
     channel = get_channel_for_product(product)
-    hist = _min_price_line(product.sale_price, min_price)
-
-    # Comparación cross-store solo para electro
-    compare_block = ""
-    if should_compare(product.category):
-        try:
-            results = compare_prices(product.name)
-            compare_block = format_comparison(results, store, product.sale_price)
-        except Exception:
-            pass
-
+    hist = _history_block(product.sale_price, min_data, last_prices or [])
     text = (
         f"🔥 <b>OFERTA {product.discount_pct:.0f}% DESCUENTO en {store}</b>\n\n"
         f"📦 <b>{product.name}</b>\n"
@@ -253,8 +265,7 @@ def notify_big_discount(product, min_price: int | None = None) -> bool:
         f"💰 Precio normal: <s>${product.normal_price:,}</s>\n"
         f"✅ Precio oferta: <b>${product.sale_price:,}</b>\n"
         f"📉 Descuento: <b>{product.discount_pct:.0f}%</b> (ahorras ${savings:,})"
-        f"{hist}"
-        f"{compare_block}\n\n"
+        f"{hist}\n\n"
         f"🔗 <a href=\"{product.url}\">Ver oferta</a>"
     )
     ok = _send(text, chat_id=channel)

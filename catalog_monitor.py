@@ -43,7 +43,7 @@ import mundovino_scraper
 import liquidos_scraper
 import booz_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
-from storage import clear_old_notifications, get_min_price, has_been_notified, init_db, mark_notified, save_price
+from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, init_db, mark_notified, save_price
 
 load_dotenv()
 
@@ -118,7 +118,8 @@ def scan_store(categories: list[dict], scraper_module, store_name: str, min_disc
                 logging.info(f"    [{tag}] {p.name[:55]} | {p.discount_pct:.0f}% | ${p.sale_price:,}")
 
                 # Registrar precio en historial ANTES de notificar
-                min_price = get_min_price(p.url)
+                min_data = get_min_price_with_date(p.url)
+                last_prices = get_last_prices(p.url, limit=2)
                 save_price(p.name, p.url, p.sale_price)
 
                 if has_been_notified(p.url, p.sale_price):
@@ -126,11 +127,11 @@ def scan_store(categories: list[dict], scraper_module, store_name: str, min_disc
                     continue
 
                 if p.discount_pct >= PRICE_ERROR_THRESHOLD:
-                    ok = notify_price_error(p, min_price)
+                    ok = notify_price_error(p, min_data, last_prices)
                     if ok:
                         total_errors += 1
                 else:
-                    ok = notify_big_discount(p, min_price)
+                    ok = notify_big_discount(p, min_data, last_prices)
                     if ok:
                         total_alerts += 1
 

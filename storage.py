@@ -92,6 +92,26 @@ def get_min_price(url: str) -> int | None:
     return row[0] if row and row[0] is not None else None
 
 
+def get_min_price_with_date(url: str) -> tuple[int, str] | None:
+    """Retorna (precio_minimo, fecha) o None si no hay historial."""
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT price, checked_at FROM price_history WHERE url = ? ORDER BY price ASC, checked_at ASC LIMIT 1",
+            (url,),
+        ).fetchone()
+    return (row[0], row[1]) if row else None
+
+
+def get_last_prices(url: str, limit: int = 2) -> list[tuple[int, str]]:
+    """Retorna los últimos N precios registrados (precio, fecha), del más reciente al más antiguo."""
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT price, checked_at FROM price_history WHERE url = ? ORDER BY checked_at DESC LIMIT ?",
+            (url, limit),
+        ).fetchall()
+    return [(r[0], r[1]) for r in rows]
+
+
 def get_price_history(url: str, limit: int = 10) -> list[dict]:
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute(
