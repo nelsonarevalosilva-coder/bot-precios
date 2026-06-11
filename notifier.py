@@ -47,7 +47,7 @@ STORE_CHANNEL = {
     "Silk Perfumes":        "perfumes",
     "Blush-Bar":            "belleza",
     "Sally Beauty":         "belleza",
-    "Sokobox":              "jugueteria",
+    "Sokobox":              "belleza",
     "Gotta":                "zapatillas",
     "Saxoline":             "zapatillas",
     "Kippy Chile":          "zapatillas",
