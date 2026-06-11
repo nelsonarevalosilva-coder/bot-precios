@@ -53,6 +53,8 @@ import saxoline_scraper
 import kippichile_scraper
 import rosen_scraper
 import ahumada_scraper
+import cruzverde_scraper
+import thebodyshop_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
 from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, init_db, mark_notified, save_price
 
@@ -88,12 +90,14 @@ SAXOLINE_CATEGORIES_FILE = BASE_DIR / "saxoline_categories.json"
 KIPPICHILE_CATEGORIES_FILE = BASE_DIR / "kippichile_categories.json"
 ROSEN_CATEGORIES_FILE = BASE_DIR / "rosen_categories.json"
 AHUMADA_CATEGORIES_FILE = BASE_DIR / "ahumada_categories.json"
+CRUZVERDE_CATEGORIES_FILE = BASE_DIR / "cruzverde_categories.json"
+THEBODYSHOP_CATEGORIES_FILE = BASE_DIR / "thebodyshop_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
 PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "80"))
 LICORES_MIN_DISCOUNT = 30.0  # umbral para licores y tiendas con descuentos bajos
-LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz", "Sokobox"}
+LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz", "Sokobox", "Cruz Verde"}
 
 
 def setup_logging(debug: bool = False):
@@ -180,7 +184,11 @@ def run_catalog_scan(
     logging.info(f"{'='*60}")
 
     def _store_discount(store_name: str) -> float:
-        return LICORES_MIN_DISCOUNT if store_name in LICORES_STORES else min_discount
+        if store_name in LICORES_STORES:
+            return LICORES_MIN_DISCOUNT
+        if store_name == "The Body Shop":
+            return 20.0  # API ya filtra solo on_sale=true, rango real 5-33%
+        return min_discount
 
     stores_to_run: list[tuple] = []
     if only_store is None or only_store.lower() == "ripley":
@@ -241,6 +249,10 @@ def run_catalog_scan(
         stores_to_run.append((load_json(ROSEN_CATEGORIES_FILE), rosen_scraper, "Rosen", _store_discount("Rosen")))
     if only_store is None or only_store.lower() == "ahumada":
         stores_to_run.append((load_json(AHUMADA_CATEGORIES_FILE), ahumada_scraper, "Farmacia Ahumada", _store_discount("Farmacia Ahumada")))
+    if only_store is None or only_store.lower() == "cruzverde":
+        stores_to_run.append((load_json(CRUZVERDE_CATEGORIES_FILE), cruzverde_scraper, "Cruz Verde", _store_discount("Cruz Verde")))
+    if only_store is None or only_store.lower() == "thebodyshop":
+        stores_to_run.append((load_json(THEBODYSHOP_CATEGORIES_FILE), thebodyshop_scraper, "The Body Shop", _store_discount("The Body Shop")))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -283,7 +295,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
@@ -293,7 +305,7 @@ def main():
         run_catalog_scan(only_store=args.store, debug=args.debug)
         sys.exit(0)
 
-    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 29 tiendas")
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 31 tiendas")
 
     run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
 
