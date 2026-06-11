@@ -25,6 +25,9 @@ CHANNEL_IDS = {
     "automotriz":    -1003962932016,
     "ferreteria":    -1003848024596,
     "licores":       -1004053668233,
+    "belleza":       -1003936872606,
+    "farmacia":      -1003636628389,
+    "jugueteria":    0,  # TODO: pendiente ID canal juguetería
 }
 
 # Tiendas que siempre van a un canal específico
@@ -40,6 +43,15 @@ STORE_CHANNEL = {
     "Hush Puppies":         "zapatillas",
     "IKEA":                 "muebles_hogar",
     "Amoble":               "muebles_hogar",
+    "Rosen":                "muebles_hogar",
+    "Silk Perfumes":        "perfumes",
+    "Blush-Bar":            "belleza",
+    "Sally Beauty":         "belleza",
+    "Sokobox":              "jugueteria",
+    "Gotta":                "zapatillas",
+    "Saxoline":             "zapatillas",
+    "Kippy Chile":          "zapatillas",
+    "Farmacia Ahumada":     "farmacia",
 }
 
 # Keywords de categoría → canal (el primer match gana)
@@ -110,7 +122,8 @@ def get_channel_for_product(product) -> int:
 
     # 1. Override por tienda
     if store in STORE_CHANNEL:
-        return CHANNEL_IDS[STORE_CHANNEL[store]]
+        ch = CHANNEL_IDS.get(STORE_CHANNEL[store], 0)
+        return ch if ch != 0 else int(CHAT_ID)
 
     # 2. Reebok: por categoría
     if store == "Reebok":
@@ -280,7 +293,7 @@ def notify_catalog_summary(total_found: int, categories_scanned: int, errors_fou
     """Resumen del escaneo — va al canal principal."""
     error_line = f"\n🚨 Errores de precio (+70%): <b>{errors_found}</b>" if errors_found > 0 else ""
     text = (
-        f"✅ <b>Escaneo completado — 20 tiendas</b>\n"
+        f"✅ <b>Escaneo completado — 29 tiendas</b>\n"
         f"📂 Categorías revisadas: {categories_scanned}\n"
         f"🔥 Ofertas enviadas: {total_found}"
         f"{error_line}"

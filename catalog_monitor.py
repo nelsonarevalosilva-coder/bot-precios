@@ -44,6 +44,15 @@ import liquidos_scraper
 import booz_scraper
 import ikea_scraper
 import amoble_scraper
+import silkperfumes_scraper
+import blushbar_scraper
+import sallybeauty_scraper
+import sokobox_scraper
+import gotta_scraper
+import saxoline_scraper
+import kippichile_scraper
+import rosen_scraper
+import ahumada_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
 from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, init_db, mark_notified, save_price
 
@@ -70,12 +79,21 @@ LIQUIDOS_CATEGORIES_FILE = BASE_DIR / "liquidos_categories.json"
 BOOZ_CATEGORIES_FILE = BASE_DIR / "booz_categories.json"
 IKEA_CATEGORIES_FILE = BASE_DIR / "ikea_categories.json"
 AMOBLE_CATEGORIES_FILE = BASE_DIR / "amoble_categories.json"
+SILKPERFUMES_CATEGORIES_FILE = BASE_DIR / "silkperfumes_categories.json"
+BLUSHBAR_CATEGORIES_FILE = BASE_DIR / "blushbar_categories.json"
+SALLYBEAUTY_CATEGORIES_FILE = BASE_DIR / "sallybeauty_categories.json"
+SOKOBOX_CATEGORIES_FILE = BASE_DIR / "sokobox_categories.json"
+GOTTA_CATEGORIES_FILE = BASE_DIR / "gotta_categories.json"
+SAXOLINE_CATEGORIES_FILE = BASE_DIR / "saxoline_categories.json"
+KIPPICHILE_CATEGORIES_FILE = BASE_DIR / "kippichile_categories.json"
+ROSEN_CATEGORIES_FILE = BASE_DIR / "rosen_categories.json"
+AHUMADA_CATEGORIES_FILE = BASE_DIR / "ahumada_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
 PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "80"))
-LICORES_MIN_DISCOUNT = 30.0  # umbral especial para tiendas de licores
-LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz"}
+LICORES_MIN_DISCOUNT = 30.0  # umbral para licores y tiendas con descuentos bajos
+LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz", "Sokobox"}
 
 
 def setup_logging(debug: bool = False):
@@ -205,6 +223,24 @@ def run_catalog_scan(
         stores_to_run.append((load_json(IKEA_CATEGORIES_FILE), ikea_scraper, "IKEA", _store_discount("IKEA")))
     if only_store is None or only_store.lower() == "amoble":
         stores_to_run.append((load_json(AMOBLE_CATEGORIES_FILE), amoble_scraper, "Amoble", _store_discount("Amoble")))
+    if only_store is None or only_store.lower() == "silkperfumes":
+        stores_to_run.append((load_json(SILKPERFUMES_CATEGORIES_FILE), silkperfumes_scraper, "Silk Perfumes", _store_discount("Silk Perfumes")))
+    if only_store is None or only_store.lower() == "blushbar":
+        stores_to_run.append((load_json(BLUSHBAR_CATEGORIES_FILE), blushbar_scraper, "Blush-Bar", _store_discount("Blush-Bar")))
+    if only_store is None or only_store.lower() == "sallybeauty":
+        stores_to_run.append((load_json(SALLYBEAUTY_CATEGORIES_FILE), sallybeauty_scraper, "Sally Beauty", _store_discount("Sally Beauty")))
+    if only_store is None or only_store.lower() == "sokobox":
+        stores_to_run.append((load_json(SOKOBOX_CATEGORIES_FILE), sokobox_scraper, "Sokobox", _store_discount("Sokobox")))
+    if only_store is None or only_store.lower() == "gotta":
+        stores_to_run.append((load_json(GOTTA_CATEGORIES_FILE), gotta_scraper, "Gotta", _store_discount("Gotta")))
+    if only_store is None or only_store.lower() == "saxoline":
+        stores_to_run.append((load_json(SAXOLINE_CATEGORIES_FILE), saxoline_scraper, "Saxoline", _store_discount("Saxoline")))
+    if only_store is None or only_store.lower() == "kippichile":
+        stores_to_run.append((load_json(KIPPICHILE_CATEGORIES_FILE), kippichile_scraper, "Kippy Chile", _store_discount("Kippy Chile")))
+    if only_store is None or only_store.lower() == "rosen":
+        stores_to_run.append((load_json(ROSEN_CATEGORIES_FILE), rosen_scraper, "Rosen", _store_discount("Rosen")))
+    if only_store is None or only_store.lower() == "ahumada":
+        stores_to_run.append((load_json(AHUMADA_CATEGORIES_FILE), ahumada_scraper, "Farmacia Ahumada", _store_discount("Farmacia Ahumada")))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -247,7 +283,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
@@ -257,7 +293,7 @@ def main():
         run_catalog_scan(only_store=args.store, debug=args.debug)
         sys.exit(0)
 
-    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% (licores >= {LICORES_MIN_DISCOUNT:.0f}%) | 20 tiendas")
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 29 tiendas")
 
     run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
 
