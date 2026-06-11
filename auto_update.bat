@@ -8,7 +8,7 @@ if %errorlevel% == 1 (
     git pull origin main
     taskkill /f /im python.exe >nul 2>&1
     timeout /t 5 /nobreak >nul
-    start /min cmd /c "cd /d "%~dp0" && python catalog_monitor.py"
+    start /min cmd /c "python catalog_monitor.py"
     echo Bot reiniciado.
 ) else (
     echo Sin cambios nuevos.
