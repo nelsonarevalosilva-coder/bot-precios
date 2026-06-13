@@ -64,6 +64,7 @@ STORE_CHANNEL = {
     "Oferta Perfumes":      "perfumes",
     "Yauras":               "perfumes",
     "Elite Perfumes":       "perfumes",
+    "Sairam":               "perfumes",
 }
 
 # Keywords de categoría → canal (el primer match gana)
@@ -305,7 +306,7 @@ def notify_catalog_summary(total_found: int, categories_scanned: int, errors_fou
     """Resumen del escaneo — va al canal principal."""
     error_line = f"\n🚨 Errores de precio (+70%): <b>{errors_found}</b>" if errors_found > 0 else ""
     text = (
-        f"✅ <b>Escaneo completado — 41 tiendas</b>\n"
+        f"✅ <b>Escaneo completado — 42 tiendas</b>\n"
         f"📂 Categorías revisadas: {categories_scanned}\n"
         f"🔥 Ofertas enviadas: {total_found}"
         f"{error_line}"
