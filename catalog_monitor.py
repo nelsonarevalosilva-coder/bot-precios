@@ -62,6 +62,9 @@ import lodoro_scraper
 import santiagoperfumes_scraper
 import adidas_scraper
 import nike_scraper
+import ofertaperfumes_scraper
+import yauras_scraper
+import eliteperfumes_scraper
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
 from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, init_db, mark_notified, save_price
 
@@ -106,6 +109,9 @@ LODORO_CATEGORIES_FILE = BASE_DIR / "lodoro_categories.json"
 SANTIAGOPERFUMES_CATEGORIES_FILE = BASE_DIR / "santiagoperfumes_categories.json"
 ADIDAS_CATEGORIES_FILE = BASE_DIR / "adidas_categories.json"
 NIKE_CATEGORIES_FILE = BASE_DIR / "nike_categories.json"
+OFERTAPERFUMES_CATEGORIES_FILE = BASE_DIR / "ofertaperfumes_categories.json"
+YAURAS_CATEGORIES_FILE = BASE_DIR / "yauras_categories.json"
+ELITEPERFUMES_CATEGORIES_FILE = BASE_DIR / "eliteperfumes_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
@@ -281,6 +287,12 @@ def run_catalog_scan(
         stores_to_run.append((load_json(ADIDAS_CATEGORIES_FILE), adidas_scraper, "Adidas", _store_discount("Adidas")))
     if only_store is None or only_store.lower() == "nike":
         stores_to_run.append((load_json(NIKE_CATEGORIES_FILE), nike_scraper, "Nike", _store_discount("Nike")))
+    if only_store is None or only_store.lower() == "ofertaperfumes":
+        stores_to_run.append((load_json(OFERTAPERFUMES_CATEGORIES_FILE), ofertaperfumes_scraper, "Oferta Perfumes", _store_discount("Oferta Perfumes")))
+    if only_store is None or only_store.lower() == "yauras":
+        stores_to_run.append((load_json(YAURAS_CATEGORIES_FILE), yauras_scraper, "Yauras", _store_discount("Yauras")))
+    if only_store is None or only_store.lower() == "eliteperfumes":
+        stores_to_run.append((load_json(ELITEPERFUMES_CATEGORIES_FILE), eliteperfumes_scraper, "Elite Perfumes", _store_discount("Elite Perfumes")))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -323,7 +335,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop", "mundoaromas", "cosmetic", "alishaperfumes", "lodoro", "santiagoperfumes", "adidas", "nike"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop", "mundoaromas", "cosmetic", "alishaperfumes", "lodoro", "santiagoperfumes", "adidas", "nike", "ofertaperfumes", "yauras", "eliteperfumes"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
@@ -333,7 +345,7 @@ def main():
         run_catalog_scan(only_store=args.store, debug=args.debug)
         sys.exit(0)
 
-    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 38 tiendas")
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 41 tiendas")
 
     run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
 
