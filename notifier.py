@@ -65,6 +65,15 @@ STORE_CHANNEL = {
     "Yauras":               "perfumes",
     "Elite Perfumes":       "perfumes",
     "Sairam":               "perfumes",
+    "Bata":                 "zapatillas",
+    "New Balance":          "zapatillas",
+    "Converse":             "zapatillas",
+    "Skechers":             "zapatillas",
+    "Decathlon":            "deportes",
+    "Under Armour":         "deportes",
+    "Zara":                 "ropa",
+    "Xiaomi":               "tecnologia",
+    "Corona":               "muebles_hogar",
 }
 
 # Keywords de categoría → canal (el primer match gana)
@@ -330,7 +339,7 @@ def notify_catalog_summary(total_found: int, categories_scanned: int, errors_fou
     """Resumen del escaneo — va al canal principal."""
     error_line = f"\n🚨 Errores de precio (+70%): <b>{errors_found}</b>" if errors_found > 0 else ""
     text = (
-        f"✅ <b>Escaneo completado — 43 tiendas</b>\n"
+        f"✅ <b>Escaneo completado — 52 tiendas</b>\n"
         f"📂 Categorías revisadas: {categories_scanned}\n"
         f"🔥 Ofertas enviadas: {total_found}"
         f"{error_line}"
