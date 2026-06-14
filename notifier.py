@@ -27,7 +27,7 @@ CHANNEL_IDS = {
     "licores":       -1004053668233,
     "belleza":       -1003936872606,
     "farmacia":      -1003636628389,
-    "jugueteria":    0,  # TODO: pendiente ID canal juguetería
+    "jugueteria":    -1003791149328,
 }
 
 # Tiendas que siempre van a un canal específico
@@ -134,8 +134,8 @@ CATEGORY_KEYWORDS = [
     ("infantil",        "ropa"),
     ("niño",            "ropa"),
     ("bebe",            "ropa"),
-    ("juguete",         "tecnologia"),   # temporal — canal juguetería pendiente
-    ("jugueteria",      "tecnologia"),   # temporal — canal juguetería pendiente
+    ("juguete",         "jugueteria"),
+    ("jugueteria",      "jugueteria"),
     ("outlet",          "tecnologia"),
     ("automotriz",      "automotriz"),
     ("licor",           "licores"),
