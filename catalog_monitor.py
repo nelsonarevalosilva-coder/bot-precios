@@ -211,7 +211,9 @@ def run_catalog_scan(
         if store_name in LICORES_STORES:
             return LICORES_MIN_DISCOUNT
         if store_name == "The Body Shop":
-            return 20.0  # API ya filtra solo on_sale=true, rango real 5-33%
+            return 20.0
+        if store_name in {"Nike", "Adidas"}:
+            return 25.0
         return min_discount
 
     stores_to_run: list[tuple] = []
