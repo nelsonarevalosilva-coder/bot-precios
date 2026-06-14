@@ -8,6 +8,7 @@ Estructura de precio en el HTML:
   <span aria-label="Ahora: 34099 pesos chilenos">...</span>  <- oferta
   <span class="poly-price__disc_label">52% OFF</span>        <- descuento
 """
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -220,11 +221,9 @@ def scrape_category(
                     page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.7)")
                     page.wait_for_timeout(2000)
                 except PlaywrightTimeout:
-                    if debug:
-                        print(f"  [ML] Timeout p{page_num+1}, parseando lo disponible")
+                    logging.warning("[ML] Timeout cargando pagina %d, parseando lo disponible", page_num + 1)
                 except Exception as e:
-                    if debug:
-                        print(f"  [ML] Error p{page_num+1}: {e}")
+                    logging.error("[ML] Error navegando pagina %d: %s", page_num + 1, e)
                     break
 
                 html = page.content()
@@ -239,8 +238,7 @@ def scrape_category(
                         all_products.append(p)
                         page_found += 1
 
-                if debug:
-                    print(f"  [ML] p{page_num+1}: {page_found} productos nuevos >= {min_discount:.0f}%")
+                logging.info("[ML] p%d: %d productos >= %.0f%%", page_num + 1, page_found, min_discount)
 
                 if page_found == 0 and page_num >= 1:
                     break
@@ -249,7 +247,6 @@ def scrape_category(
             browser.close()
 
     except Exception as e:
-        if debug:
-            print(f"  [ML] Error general: {e}")
+        logging.error("[ML] Error general en scraper: %s", e)
 
     return all_products
