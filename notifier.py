@@ -95,7 +95,15 @@ CATEGORY_KEYWORDS = [
     ("impresora",       "tecnologia"),
     ("componente",      "tecnologia"),
     ("perfume",         "perfumes"),
-    ("belleza",         "perfumes"),
+    ("fragancia",       "perfumes"),
+    ("colonia",         "perfumes"),
+    ("belleza",         "belleza"),
+    ("maquillaje",      "belleza"),
+    ("cosmetico",       "belleza"),
+    ("cosmético",       "belleza"),
+    ("skincare",        "belleza"),
+    ("shampoo",         "belleza"),
+    ("serum",           "belleza"),
     ("deporte",         "deportes"),
     ("ferreteria",      "ferreteria"),
     ("ferretería",      "ferreteria"),
@@ -116,15 +124,30 @@ CATEGORY_KEYWORDS = [
     ("decoraci",        "muebles_hogar"),
     ("iluminaci",       "muebles_hogar"),
     ("hogar",           "muebles_hogar"),
+    ("mascota",         "muebles_hogar"),
+    ("salud",           "farmacia"),
+    ("farmacia",        "farmacia"),
     ("ropa",            "ropa"),
     ("moda",            "ropa"),
     ("hombre",          "ropa"),
     ("mujer",           "ropa"),
+    ("infantil",        "ropa"),
+    ("niño",            "ropa"),
+    ("bebe",            "ropa"),
+    ("juguete",         "tecnologia"),   # temporal — canal juguetería pendiente
+    ("jugueteria",      "tecnologia"),   # temporal — canal juguetería pendiente
+    ("outlet",          "tecnologia"),
     ("automotriz",      "automotriz"),
     ("licor",           "licores"),
     ("vino",            "licores"),
     ("cerveza",         "licores"),
     ("whisky",          "licores"),
+    ("pisco",           "licores"),
+    ("ron",             "licores"),
+    ("vodka",           "licores"),
+    ("gin",             "licores"),
+    ("tequila",         "licores"),
+    ("espumante",       "licores"),
 ]
 
 
@@ -136,7 +159,7 @@ def get_channel_for_product(product) -> int:
     # 1. Override por tienda
     if store in STORE_CHANNEL:
         ch = CHANNEL_IDS.get(STORE_CHANNEL[store], 0)
-        return ch if ch != 0 else int(CHAT_ID)
+        return ch if ch != 0 else CHANNEL_IDS["tecnologia"]
 
     # 2. Reebok: por categoría
     if store == "Reebok":
@@ -152,11 +175,12 @@ def get_channel_for_product(product) -> int:
 
     # 4. Keyword de categoría
     for keyword, channel_key in CATEGORY_KEYWORDS:
-        if keyword in category:
-            return CHANNEL_IDS[channel_key]
+        ch = CHANNEL_IDS.get(channel_key, 0)
+        if keyword in category and ch != 0:
+            return ch
 
-    # 5. Fallback: canal principal
-    return int(CHAT_ID)
+    # 5. Fallback: tecnologia (evita que llegue al canal principal)
+    return CHANNEL_IDS["tecnologia"]
 
 
 def _send(text: str, chat_id=None) -> bool:
