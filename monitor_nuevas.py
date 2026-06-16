@@ -21,6 +21,7 @@ import underarmour_scraper
 import zara_scraper
 import xiaomi_scraper
 import corona_scraper
+import mercadolibre_scraper
 from catalog_monitor import scan_store, PRICE_ERROR_THRESHOLD
 from notifier import notify_catalog_summary
 from storage import clear_old_notifications, init_db
@@ -47,6 +48,7 @@ STORES = [
     (load_json(BASE_DIR / "zara_categories.json"),         zara_scraper,         "Zara",          40.0),
     (load_json(BASE_DIR / "xiaomi_categories.json"),       xiaomi_scraper,       "Xiaomi",        40.0),
     (load_json(BASE_DIR / "corona_categories.json"),       corona_scraper,       "Corona",        40.0),
+    (load_json(BASE_DIR / "mercadolibre_categories.json"), mercadolibre_scraper, "Mercado Libre", 40.0),
 ]
 
 
