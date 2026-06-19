@@ -1,3 +1,5 @@
 [
-  {"name": "Sale", "url": "https://www.converse.com/cl"}
+  {"name": "Outlet",     "url": "https://www.converse.com/cl/es/outlet"},
+  {"name": "Sale Mujer", "url": "https://www.converse.com/cl/es/c/woman-sale"},
+  {"name": "Sale Hombre","url": "https://www.converse.com/cl/es/c/man-sale"}
 ]
