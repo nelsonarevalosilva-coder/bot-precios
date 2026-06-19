@@ -140,6 +140,11 @@ MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
 PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "80"))
 LICORES_MIN_DISCOUNT = 30.0  # umbral para licores y tiendas con descuentos bajos
 LICORES_STORES = {"El Mundo del Vino", "Liquidos", "Booz", "Sokobox", "Cruz Verde"}
+PERFUMES_MIN_DISCOUNT = 90.0
+PERFUMES_STORES = {
+    "Multimarcas Perfumes", "Silk Perfumes", "Mundo Aromas", "Alisha Perfumes",
+    "Lo Doro", "Santiago Perfumes", "Oferta Perfumes", "Yauras", "Elite Perfumes", "Sairam",
+}
 
 
 def setup_logging(debug: bool = False):
@@ -226,6 +231,8 @@ def run_catalog_scan(
     logging.info(f"{'='*60}")
 
     def _store_discount(store_name: str) -> float:
+        if store_name in PERFUMES_STORES:
+            return PERFUMES_MIN_DISCOUNT
         if store_name in LICORES_STORES:
             return LICORES_MIN_DISCOUNT
         if store_name == "The Body Shop":
