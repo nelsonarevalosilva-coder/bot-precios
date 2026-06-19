@@ -1,6 +1,11 @@
 @echo off
-cd /d "%~dp0"
-taskkill /f /im python.exe >nul 2>&1
-timeout /t 2 /nobreak >nul
-start /min cmd /c "python catalog_monitor.py"
-echo Bot iniciado.
+cd /d "C:\Users\Nelson Arévalo\bot-precios"
+:loop
+echo.
+echo [%date% %time%] Actualizando codigo...
+git pull
+echo [%date% %time%] Iniciando bot...
+python catalog_monitor.py
+echo [%date% %time%] Bot detenido. Reiniciando en 15 segundos...
+timeout /t 15 /nobreak
+goto loop
