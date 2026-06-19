@@ -1,22 +1,21 @@
 """
-Scraper para Zara Chile — API REST de Inditex.
-Requiere IP chilena. Retorna [] si bloqueado por geo-restricción.
+Scraper para Zara Chile — Playwright con intercepción de red.
+La plataforma Inditex requiere sesión de navegador para servir productos.
 """
 import logging
 import re
 import time
 from dataclasses import dataclass
 
-import requests
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+
+try:
+    from playwright_stealth import stealth_sync
+    _HAS_STEALTH = True
+except ImportError:
+    _HAS_STEALTH = False
 
 BASE_URL = "https://www.zara.com"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/javascript, */*; q=0.01",
-    "Accept-Language": "es-CL,es;q=0.9",
-    "Referer": "https://www.zara.com/cl/es/",
-    "X-Requested-With": "XMLHttpRequest",
-}
 
 
 @dataclass
@@ -34,37 +33,61 @@ def _clean_price(val) -> int | None:
     if val is None:
         return None
     if isinstance(val, (int, float)):
-        return int(val)
+        v = int(val)
+        # Zara devuelve precios en centavos (ej: 2990000 = $29.900)
+        return v // 100 if v > 1_000_000 else v
     digits = re.sub(r"[^\d]", "", str(val))
-    return int(digits) if digits and 2 < len(digits) < 10 else None
+    if not digits or not (2 < len(digits) < 12):
+        return None
+    v = int(digits)
+    return v // 100 if v > 1_000_000 else v
 
 
-def _parse_groups(data, category_name: str, min_discount: float, seen: set) -> list[Product]:
+def _parse_zara_response(data, category_name: str, min_discount: float, seen: set) -> list[Product]:
     results = []
     if not isinstance(data, dict):
         return results
 
-    # Extraer todos los commercialComponents de cualquier estructura
-    raw_items = []
-    for group in (data.get("productGroups") or []):
-        for elem in (group.get("elements") or []):
-            raw_items.extend(elem.get("commercialComponents") or [])
+    # Zara devuelve productos en varias estructuras según el endpoint
+    raw_products = (
+        data.get("productGroups") or
+        data.get("products") or
+        data.get("items") or
+        []
+    )
 
-    # Fallback: buscar en "sections"
-    if not raw_items:
-        for section in (data.get("sections") or []):
-            for elem in (section.get("elements") or []):
-                raw_items.extend(elem.get("commercialComponents") or [])
+    items = []
+    for entry in raw_products:
+        if isinstance(entry, dict):
+            # productGroups tiene elementos anidados con commercialComponents
+            for elem in (entry.get("elements") or []):
+                items.extend(elem.get("commercialComponents") or [elem])
+            # O directamente es un producto
+            if "name" in entry or "productName" in entry:
+                items.append(entry)
+    if not items:
+        items = raw_products
 
-    for item in raw_items:
+    for item in items:
         try:
-            name = item.get("name") or ""
+            name = (item.get("name") or item.get("productName") or "").strip()
             if not name:
                 continue
 
             detail = item.get("detail") or {}
-            link_obj = detail.get("link") or item.get("link") or {}
-            product_url = link_obj.get("url") or (link_obj if isinstance(link_obj, str) else "")
+            seo = item.get("seo") or {}
+
+            # URL del producto
+            link = (detail.get("link") or item.get("link") or {})
+            if isinstance(link, dict):
+                product_url = link.get("url") or link.get("href") or ""
+            else:
+                product_url = str(link)
+
+            if not product_url:
+                slug = seo.get("keyword") or item.get("seoKeyword") or ""
+                if slug:
+                    product_url = f"{BASE_URL}/cl/es/{slug}.html"
             if not product_url:
                 continue
             if not product_url.startswith("http"):
@@ -72,12 +95,21 @@ def _parse_groups(data, category_name: str, min_discount: float, seen: set) -> l
             if product_url in seen:
                 continue
 
-            # displayPrice = precio actual, oldPrice = precio original antes del descuento
-            price_info = detail.get("displayPrice") or {}
-            old_price_info = detail.get("oldPrice") or {}
+            # Precios: displayPrice = actual, oldPrice = original
+            display = detail.get("displayPrice") or item.get("price") or {}
+            old = detail.get("oldPrice") or item.get("originalPrice") or {}
 
-            sale = _clean_price(price_info.get("value") or price_info.get("price"))
-            normal = _clean_price(old_price_info.get("value") or old_price_info.get("price"))
+            sale = _clean_price(display.get("value") or display.get("price") or display)
+            normal = _clean_price(old.get("value") or old.get("price") or old)
+
+            # Fallback: buscar en colors/sizes
+            if not sale:
+                for color in (item.get("detail", {}).get("colors") or item.get("colors") or []):
+                    prices = color.get("sizes", [{}])[0].get("price") or {}
+                    sale = _clean_price(prices.get("price"))
+                    normal = _clean_price(prices.get("oldPrice"))
+                    if sale:
+                        break
 
             if not sale or not normal or normal <= sale:
                 continue
@@ -95,6 +127,7 @@ def _parse_groups(data, category_name: str, min_discount: float, seen: set) -> l
             ))
         except Exception:
             continue
+
     return results
 
 
@@ -102,54 +135,89 @@ def scrape_category(
     url: str,
     category_name: str,
     min_discount: float = 40.0,
-    max_pages: int = 5,
+    max_pages: int = 3,
     debug: bool = False,
 ) -> list[Product]:
-    results: list[Product] = []
+    all_products: list[Product] = []
     seen: set = set()
+    api_responses: list[dict] = []
 
-    session = requests.Session()
-    session.headers.update(HEADERS)
-
-    # Calentar sesión para obtener cookies
-    try:
-        session.get("https://www.zara.com/cl/es/", timeout=15, allow_redirects=True)
-    except Exception:
-        pass
-
-    # Extraer base de la URL (sin .html) y agregar parámetro AJAX
-    base_page = re.sub(r"\.html$", "", url)
-
-    for page_num in range(max_pages):
+    def handle_response(resp):
         try:
-            params = {"ajax": "true", "action": "CATEGORYNAV"}
-            if page_num > 0:
-                params["start"] = str(page_num * 24)
+            if (
+                resp.status == 200
+                and "json" in resp.headers.get("content-type", "")
+                and "zara.com" in resp.url
+                and any(k in resp.url for k in [
+                    "product", "category", "search", "catalog",
+                    "itxrest", "ajax", "section",
+                ])
+            ):
+                body = resp.json()
+                if isinstance(body, dict) and (
+                    body.get("productGroups") or body.get("products") or
+                    body.get("items") or body.get("sections")
+                ):
+                    api_responses.append(body)
+        except Exception:
+            pass
 
-            resp = session.get(base_page, params=params, timeout=15)
-            if resp.status_code != 200:
-                if debug:
-                    print(f"  [zara] {category_name} status {resp.status_code}")
-                break
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"],
+            )
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="es-CL",
+                viewport={"width": 1920, "height": 1080},
+                extra_http_headers={"Accept-Language": "es-CL,es;q=0.9"},
+            )
+            page = context.new_page()
+            if _HAS_STEALTH:
+                stealth_sync(page)
+            page.on("response", handle_response)
+
+            # Calentar sesión en el home de Zara Chile
+            try:
+                page.goto(f"{BASE_URL}/cl/es/", wait_until="load", timeout=30000)
+                page.wait_for_timeout(2000)
+            except Exception:
+                pass
 
             try:
-                data = resp.json()
-            except Exception:
+                page.goto(url, wait_until="networkidle", timeout=50000)
+                page.wait_for_timeout(3000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
+                page.wait_for_timeout(2000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2000)
+
                 if debug:
-                    print(f"  [zara] {category_name} respuesta no es JSON")
-                break
+                    print(f"  [zara] {category_name}: {page.title()[:60]} | respuestas: {len(api_responses)}")
 
-            found = _parse_groups(data, category_name, min_discount, seen)
-            results.extend(found)
-            if debug:
-                print(f"  [zara] {category_name} p{page_num+1}: {len(found)} productos")
+            except PlaywrightTimeout:
+                logging.warning("[zara] Timeout en %s — usando lo capturado", category_name)
+            except Exception as e:
+                logging.error("[zara] Error en %s: %s", category_name, e)
 
-            if not found:
-                break
-            time.sleep(1)
+            browser.close()
 
-        except Exception as e:
-            logging.error("[zara] Error en %s p%d: %s", category_name, page_num + 1, e)
-            break
+    except Exception as e:
+        logging.error("[zara] Error general: %s", e)
 
-    return results
+    for data in api_responses:
+        found = _parse_zara_response(data, category_name, min_discount, seen)
+        if found and debug:
+            print(f"  [zara] {len(found)} productos desde respuesta interceptada")
+        all_products.extend(found)
+
+    if debug:
+        print(f"  [zara] Total: {len(all_products)} productos >= {min_discount:.0f}%")
+
+    return all_products
