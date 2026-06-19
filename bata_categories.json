@@ -1,5 +1,4 @@
 [
-  {"name": "Sale",          "url": "https://www.bata.cl/collections/sale"},
-  {"name": "Outlet Hombre", "url": "https://www.bata.cl/collections/hombre-sale"},
-  {"name": "Outlet Mujer",  "url": "https://www.bata.cl/collections/mujer-sale"}
+  {"name": "Sale",   "url": "https://www.bata.cl/collections/sale"},
+  {"name": "Outlet", "url": "https://www.bata.cl/collections/outlet"}
 ]
