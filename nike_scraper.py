@@ -168,61 +168,27 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                     if debug:
                         print(f"  [nike] __STATE__ error: {e}")
 
-                # 2. Extraer precios del DOM directamente
+                # 2. Fetch API desde dentro del browser (usa cookies Cloudflare ya establecidas)
                 try:
-                    dom_data = page.evaluate("""() => {
-                        const results = [];
-                        const cards = document.querySelectorAll(
-                            '[class*="productCard"], [class*="product-card"], [class*="ProductCard"], ' +
-                            '[data-testid*="product"], article[class*="product"]'
-                        );
-                        cards.forEach(card => {
-                            try {
-                                const link = card.querySelector('a[href]');
-                                const name = card.querySelector('[class*="title"],[class*="name"],[class*="productName"]');
-                                const saleEl = card.querySelector('[class*="sellingPrice"],[class*="sale-price"],[class*="salePrice"]');
-                                const listEl = card.querySelector('[class*="listPrice"],[class*="list-price"],[class*="strike"],[class*="crossed"]');
-                                const img = card.querySelector('img');
-                                if (!link || !saleEl) return;
-                                results.push({
-                                    url: link.href,
-                                    name: name ? name.innerText.trim() : link.innerText.trim(),
-                                    sale_text: saleEl.innerText.trim(),
-                                    list_text: listEl ? listEl.innerText.trim() : '',
-                                    image: img ? (img.src || img.dataset.src || '') : ''
-                                });
-                            } catch(e) {}
-                        });
-                        return results;
+                    api_json = page.evaluate("""async () => {
+                        try {
+                            const r = await fetch('/api/catalog_system/pub/products/search?fq=C:/nike/oferta/&O=OrderByBestDiscountDESC&_from=0&_to=49', {credentials:'include'});
+                            if (!r.ok) return JSON.stringify({error: r.status});
+                            return r.text();
+                        } catch(e) { return JSON.stringify({error: e.message}); }
                     }""")
                     if debug:
-                        print(f"  [nike] DOM cards: {len(dom_data)}")
-                    for item in dom_data:
-                        try:
-                            url = item["url"]
-                            if url in seen:
-                                continue
-                            normal = _clean_price(item["list_text"])
-                            sale = _clean_price(item["sale_text"])
-                            if not normal or not sale or normal <= sale:
-                                continue
-                            disc = (normal - sale) / normal * 100
-                            if disc < min_discount:
-                                continue
-                            seen.add(url)
-                            all_products.append(Product(
-                                name=item["name"][:120], url=url,
-                                normal_price=normal, sale_price=sale,
-                                discount_pct=round(disc, 1),
-                                category=category_name, store="Nike",
-                                image_url=item.get("image", "")
-                            ))
-                        except Exception:
-                            continue
+                        print(f"  [nike] in-browser fetch: {str(api_json)[:120]}")
+                    if api_json and '"error"' not in api_json[:30]:
+                        products = json.loads(api_json)
+                        if isinstance(products, list):
+                            found = _parse_vtex({"products": products}, category_name, min_discount, seen)
+                            if debug:
+                                print(f"  [nike] fetch productos: {len(products)} raw, {len(found)} con desc")
+                            all_products.extend(found)
                 except Exception as e:
                     if debug:
-                        print(f"  [nike] DOM error: {e}")
-                    page_html.append(page.content())
+                        print(f"  [nike] fetch error: {e}")
 
             except PlaywrightTimeout:
                 logging.warning("[nike] Timeout — usando lo capturado")
