@@ -87,6 +87,8 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
         try:
             ct = resp.headers.get("content-type", "")
             if resp.status == 200 and "json" in ct and "nike.cl" in resp.url:
+                if debug:
+                    print(f"  [nike] JSON: {resp.url[:100]}")
                 if any(k in resp.url for k in ["catalog_system", "intelligent-search", "product_search", "search"]):
                     body = resp.json()
                     if body:
@@ -134,7 +136,16 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
     except Exception as e:
         logging.error("[nike] Error general: %s", e)
 
-    for data in api_responses:
+    for i, data in enumerate(api_responses):
+        products_in = data if isinstance(data, list) else data.get("products", [])
+        if not products_in:
+            products_in = data.get("data", {}).get("productSearch", {}).get("products", [])
+        if debug:
+            print(f"  [nike] Respuesta {i+1}: {len(products_in)} productos en raw")
+            if products_in:
+                p0 = products_in[0]
+                pr = p0.get("priceRange", {})
+                print(f"    Ejemplo: {p0.get('productName','?')[:50]} | listPrice={pr.get('listPrice',{})} | sellingPrice={pr.get('sellingPrice',{})}")
         all_products.extend(_parse_vtex(data, category_name, min_discount, seen))
 
     if debug:
