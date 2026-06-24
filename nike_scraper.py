@@ -152,9 +152,26 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                 page.wait_for_timeout(2000)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(3000)
-                page_html.append(page.content())
                 if debug:
                     print(f"  [nike] {page.title()[:60]}")
+
+                # Extraer window.__STATE__ desde el browser (más confiable que regex)
+                try:
+                    state_json = page.evaluate("() => JSON.stringify(window.__STATE__ || null)")
+                    if state_json and state_json != "null":
+                        state = json.loads(state_json)
+                        found = _parse_state(state, category_name, min_discount, seen)
+                        if debug:
+                            print(f"  [nike] __STATE__: {len(state)} keys, {len(found)} productos")
+                        all_products.extend(found)
+                    elif debug:
+                        print("  [nike] __STATE__ no encontrado, intentando HTML")
+                        page_html.append(page.content())
+                except Exception as e:
+                    if debug:
+                        print(f"  [nike] Error extrayendo __STATE__: {e}")
+                    page_html.append(page.content())
+
             except PlaywrightTimeout:
                 logging.warning("[nike] Timeout — usando lo capturado")
                 try:
@@ -163,20 +180,6 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                     pass
             except Exception as e:
                 logging.error("[nike] Error: %s", e)
-
-            # Extraer window.__STATE__
-            for html in page_html:
-                m = re.search(r"window\.__STATE__\s*=\s*(\{.*?\})(?=\s*;?\s*</script>)", html, re.DOTALL)
-                if m:
-                    try:
-                        state = json.loads(m.group(1))
-                        found = _parse_state(state, category_name, min_discount, seen)
-                        if debug:
-                            print(f"  [nike] __STATE__: {len(state)} keys, {len(found)} productos")
-                        all_products.extend(found)
-                    except Exception as e:
-                        if debug:
-                            print(f"  [nike] Error parseando __STATE__: {e}")
 
             browser.close()
     except Exception as e:
