@@ -110,16 +110,24 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                 stealth_sync(page)
             page.on("response", handle_response)
             try:
-                page.goto(sale_url, wait_until="networkidle", timeout=60000)
-                page.wait_for_timeout(4000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
+                # Cargar home primero para obtener cookies Cloudflare
+                try:
+                    page.goto(BASE_URL, wait_until="domcontentloaded", timeout=30000)
+                    page.wait_for_timeout(3000)
+                except Exception:
+                    pass
+                page.goto(sale_url, wait_until="domcontentloaded", timeout=60000)
+                page.wait_for_timeout(5000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.3)")
+                page.wait_for_timeout(2000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.6)")
                 page.wait_for_timeout(2000)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(2000)
+                page.wait_for_timeout(3000)
                 if debug:
                     print(f"  [nike] {page.title()[:60]} | responses: {len(api_responses)}")
             except PlaywrightTimeout:
-                logging.warning("[nike] Timeout navegando")
+                logging.warning("[nike] Timeout — usando lo capturado (%d respuestas)", len(api_responses))
             except Exception as e:
                 logging.error("[nike] Error: %s", e)
             browser.close()
