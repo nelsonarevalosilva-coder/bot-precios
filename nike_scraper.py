@@ -155,7 +155,7 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                 if debug:
                     print(f"  [nike] {page.title()[:60]}")
 
-                # Extraer window.__STATE__ desde el browser (más confiable que regex)
+                # 1. Intentar window.__STATE__
                 try:
                     state_json = page.evaluate("() => JSON.stringify(window.__STATE__ || null)")
                     if state_json and state_json != "null":
@@ -164,12 +164,64 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                         if debug:
                             print(f"  [nike] __STATE__: {len(state)} keys, {len(found)} productos")
                         all_products.extend(found)
-                    elif debug:
-                        print("  [nike] __STATE__ no encontrado, intentando HTML")
-                        page_html.append(page.content())
                 except Exception as e:
                     if debug:
-                        print(f"  [nike] Error extrayendo __STATE__: {e}")
+                        print(f"  [nike] __STATE__ error: {e}")
+
+                # 2. Extraer precios del DOM directamente
+                try:
+                    dom_data = page.evaluate("""() => {
+                        const results = [];
+                        const cards = document.querySelectorAll(
+                            '[class*="productCard"], [class*="product-card"], [class*="ProductCard"], ' +
+                            '[data-testid*="product"], article[class*="product"]'
+                        );
+                        cards.forEach(card => {
+                            try {
+                                const link = card.querySelector('a[href]');
+                                const name = card.querySelector('[class*="title"],[class*="name"],[class*="productName"]');
+                                const saleEl = card.querySelector('[class*="sellingPrice"],[class*="sale-price"],[class*="salePrice"]');
+                                const listEl = card.querySelector('[class*="listPrice"],[class*="list-price"],[class*="strike"],[class*="crossed"]');
+                                const img = card.querySelector('img');
+                                if (!link || !saleEl) return;
+                                results.push({
+                                    url: link.href,
+                                    name: name ? name.innerText.trim() : link.innerText.trim(),
+                                    sale_text: saleEl.innerText.trim(),
+                                    list_text: listEl ? listEl.innerText.trim() : '',
+                                    image: img ? (img.src || img.dataset.src || '') : ''
+                                });
+                            } catch(e) {}
+                        });
+                        return results;
+                    }""")
+                    if debug:
+                        print(f"  [nike] DOM cards: {len(dom_data)}")
+                    for item in dom_data:
+                        try:
+                            url = item["url"]
+                            if url in seen:
+                                continue
+                            normal = _clean_price(item["list_text"])
+                            sale = _clean_price(item["sale_text"])
+                            if not normal or not sale or normal <= sale:
+                                continue
+                            disc = (normal - sale) / normal * 100
+                            if disc < min_discount:
+                                continue
+                            seen.add(url)
+                            all_products.append(Product(
+                                name=item["name"][:120], url=url,
+                                normal_price=normal, sale_price=sale,
+                                discount_pct=round(disc, 1),
+                                category=category_name, store="Nike",
+                                image_url=item.get("image", "")
+                            ))
+                        except Exception:
+                            continue
+                except Exception as e:
+                    if debug:
+                        print(f"  [nike] DOM error: {e}")
                     page_html.append(page.content())
 
             except PlaywrightTimeout:
