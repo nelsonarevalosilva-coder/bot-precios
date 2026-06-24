@@ -119,6 +119,42 @@ def _parse_html_cards(html: str, category_name: str, min_discount: float, seen: 
     return results
 
 
+def _parse_vtex(data, category_name, min_discount, seen):
+    results = []
+    products = data if isinstance(data, list) else data.get("products", [])
+    for p in products:
+        try:
+            pid = str(p.get("productId") or p.get("cacheId") or "")
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            name = p.get("productName", "").strip()
+            link = p.get("link", "") or p.get("linkText", "")
+            url = link if link.startswith("http") else f"{BASE_URL}{link}"
+            if not name or not url:
+                continue
+            pr = p.get("priceRange", {})
+            normal = _clean_price((pr.get("listPrice") or {}).get("highPrice"))
+            sale = _clean_price((pr.get("sellingPrice") or {}).get("lowPrice"))
+            item0 = (p.get("items") or [{}])[0]
+            if not normal or not sale:
+                offer = (item0.get("sellers") or [{}])[0].get("commertialOffer", {})
+                normal = _clean_price(offer.get("ListPrice"))
+                sale = _clean_price(offer.get("Price"))
+            image_url = (item0.get("images") or [{}])[0].get("imageUrl", "")
+            if not normal or not sale or normal <= sale:
+                continue
+            disc = (normal - sale) / normal * 100
+            if disc < min_discount:
+                continue
+            results.append(Product(name=name[:120], url=url, normal_price=normal,
+                                   sale_price=sale, discount_pct=round(disc, 1),
+                                   category=category_name, store="Nike", image_url=image_url))
+        except Exception:
+            continue
+    return results
+
+
 def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=False):
     all_products, seen = [], set()
     sale_url = f"{BASE_URL}/oferta"
