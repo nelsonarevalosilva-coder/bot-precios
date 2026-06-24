@@ -1,12 +1,13 @@
 """
-Scraper para Nike Chile — Playwright con intercepción VTEX.
-Cloudflare bloquea requests directos; Playwright bypasea con browser real.
+Scraper para Nike Chile — Playwright + extracción de window.__STATE__ (VTEX IO).
 """
+import json
 import logging
 import re
 from dataclasses import dataclass
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from bs4 import BeautifulSoup
 
 try:
     from playwright_stealth import stealth_sync
@@ -38,49 +39,78 @@ def _clean_price(val) -> int | None:
     return int(digits) if digits and 2 < len(digits) < 9 else None
 
 
-def _parse_vtex(data, category_name, min_discount, seen):
+def _parse_state(state: dict, category_name: str, min_discount: float, seen: set) -> list[Product]:
+    """Extrae productos del window.__STATE__ de VTEX IO."""
     results = []
-    products = data if isinstance(data, list) else []
-    if not products:
-        # VTEX REST
-        products = data.get("products", [])
-    if not products:
-        # VTEX GraphQL — varios posibles paths
-        d = data.get("data", {})
-        products = (d.get("productSearch") or d.get("search") or d.get("productList") or {}).get("products", [])
-    if not products:
-        # GraphQL con extensions
-        for val in data.get("data", {}).values() if isinstance(data.get("data"), dict) else []:
-            if isinstance(val, dict) and "products" in val:
-                products = val["products"]
-                break
-    for p in products:
+    for key, val in state.items():
+        if not isinstance(val, dict):
+            continue
+        # Buscar entradas Product con link y priceRange
+        product = val.get("product") or (val if "productId" in val else None)
+        if not product:
+            continue
         try:
-            pid = str(p.get("productId") or p.get("productReference") or "")
+            pid = str(product.get("productId") or "")
             if not pid or pid in seen:
                 continue
-            seen.add(pid)
-            name = p.get("productName", "").strip()
-            link = p.get("link", "")
-            url = link if link.startswith("http") else f"{BASE_URL}{link}"
-            if not name or not url:
+            name = product.get("productName", "").strip()
+            link = product.get("link", "") or product.get("linkText", "")
+            if not name or not link:
                 continue
-            pr = p.get("priceRange", {})
+            url = link if link.startswith("http") else f"{BASE_URL}/{link}/p"
+            pr = product.get("priceRange", {})
             normal = _clean_price((pr.get("listPrice") or {}).get("highPrice"))
             sale = _clean_price((pr.get("sellingPrice") or {}).get("lowPrice"))
-            item0 = (p.get("items") or [{}])[0]
+            items = product.get("items") or []
+            item0 = items[0] if items else {}
             if not normal or not sale:
                 offer = (item0.get("sellers") or [{}])[0].get("commertialOffer", {})
                 normal = _clean_price(offer.get("ListPrice"))
                 sale = _clean_price(offer.get("Price"))
             image_url = (item0.get("images") or [{}])[0].get("imageUrl", "")
-            if not image_url:
-                image_url = (p.get("items") or [{}])[0].get("images", [{}])[0].get("imageUrl", "") if p.get("items") else ""
             if not normal or not sale or normal <= sale:
                 continue
             disc = (normal - sale) / normal * 100
             if disc < min_discount:
                 continue
+            seen.add(pid)
+            results.append(Product(name=name[:120], url=url, normal_price=normal,
+                                   sale_price=sale, discount_pct=round(disc, 1),
+                                   category=category_name, store="Nike", image_url=image_url))
+        except Exception:
+            continue
+    return results
+
+
+def _parse_html_cards(html: str, category_name: str, min_discount: float, seen: set) -> list[Product]:
+    """Fallback: parsea cards del HTML buscando precios tachados."""
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
+    for card in soup.find_all(class_=re.compile(r"product-card|product_card|vtex-product", re.I)):
+        try:
+            link = card.find("a", href=True)
+            if not link:
+                continue
+            href = link["href"]
+            url = href if href.startswith("http") else f"{BASE_URL}{href}"
+            if url in seen:
+                continue
+            name_tag = card.find(class_=re.compile(r"title|name|subtitle", re.I))
+            name = name_tag.get_text(strip=True) if name_tag else link.get_text(strip=True)
+            normal_tag = card.find(class_=re.compile(r"strike|list|before|original|compare", re.I))
+            sale_tag = card.find(class_=re.compile(r"sale|selling|offer|current.*price", re.I))
+            if not normal_tag or not sale_tag:
+                continue
+            normal = _clean_price(normal_tag.get_text())
+            sale = _clean_price(sale_tag.get_text())
+            if not normal or not sale or normal <= sale:
+                continue
+            disc = (normal - sale) / normal * 100
+            if disc < min_discount:
+                continue
+            img = card.find("img")
+            image_url = (img.get("src") or img.get("data-src") or "") if img else ""
+            seen.add(url)
             results.append(Product(name=name[:120], url=url, normal_price=normal,
                                    sale_price=sale, discount_pct=round(disc, 1),
                                    category=category_name, store="Nike", image_url=image_url))
@@ -90,20 +120,9 @@ def _parse_vtex(data, category_name, min_discount, seen):
 
 
 def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=False):
-    all_products, seen, api_responses = [], set(), []
-
+    all_products, seen = [], set()
     sale_url = f"{BASE_URL}/oferta"
-
-    def handle_response(resp):
-        try:
-            ct = resp.headers.get("content-type", "")
-            if resp.status == 200 and "json" in ct and "nike.cl" in resp.url:
-                if any(k in resp.url for k in ["graphql", "catalog_system", "intelligent-search", "product_search"]):
-                    body = resp.json()
-                    if body:
-                        api_responses.append(body)
-        except Exception:
-            pass
+    page_html = []
 
     try:
         with sync_playwright() as pw:
@@ -119,9 +138,7 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
             page = context.new_page()
             if _HAS_STEALTH:
                 stealth_sync(page)
-            page.on("response", handle_response)
             try:
-                # Cargar home primero para obtener cookies Cloudflare
                 try:
                     page.goto(BASE_URL, wait_until="domcontentloaded", timeout=30000)
                     page.wait_for_timeout(3000)
@@ -129,29 +146,46 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                     pass
                 page.goto(sale_url, wait_until="domcontentloaded", timeout=60000)
                 page.wait_for_timeout(5000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.3)")
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.4)")
                 page.wait_for_timeout(2000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.6)")
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.7)")
                 page.wait_for_timeout(2000)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(3000)
+                page_html.append(page.content())
                 if debug:
-                    print(f"  [nike] {page.title()[:60]} | responses: {len(api_responses)}")
+                    print(f"  [nike] {page.title()[:60]}")
             except PlaywrightTimeout:
-                logging.warning("[nike] Timeout — usando lo capturado (%d respuestas)", len(api_responses))
+                logging.warning("[nike] Timeout — usando lo capturado")
+                try:
+                    page_html.append(page.content())
+                except Exception:
+                    pass
             except Exception as e:
                 logging.error("[nike] Error: %s", e)
+
+            # Extraer window.__STATE__
+            for html in page_html:
+                m = re.search(r"window\.__STATE__\s*=\s*(\{.*?\})(?=\s*;?\s*</script>)", html, re.DOTALL)
+                if m:
+                    try:
+                        state = json.loads(m.group(1))
+                        found = _parse_state(state, category_name, min_discount, seen)
+                        if debug:
+                            print(f"  [nike] __STATE__: {len(state)} keys, {len(found)} productos")
+                        all_products.extend(found)
+                    except Exception as e:
+                        if debug:
+                            print(f"  [nike] Error parseando __STATE__: {e}")
+
             browser.close()
     except Exception as e:
         logging.error("[nike] Error general: %s", e)
 
-    for i, data in enumerate(api_responses):
-        if debug:
-            keys = list(data.keys()) if isinstance(data, dict) else "list"
-            print(f"  [nike] Respuesta {i+1}: keys={keys}")
-            if isinstance(data, dict) and "data" in data:
-                print(f"    data keys: {list(data['data'].keys())}")
-        all_products.extend(_parse_vtex(data, category_name, min_discount, seen))
+    # Fallback HTML si __STATE__ no dio resultados
+    if not all_products:
+        for html in page_html:
+            all_products.extend(_parse_html_cards(html, category_name, min_discount, seen))
 
     if debug:
         print(f"  [nike] Total: {len(all_products)} productos >= {min_discount:.0f}%")
