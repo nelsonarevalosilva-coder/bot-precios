@@ -172,7 +172,7 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
                 try:
                     api_json = page.evaluate("""async () => {
                         try {
-                            const r = await fetch('/api/catalog_system/pub/products/search?fq=C:/nike/oferta/&O=OrderByBestDiscountDESC&_from=0&_to=49', {credentials:'include'});
+                            const r = await fetch('/api/intelligent-search/product_search?query=oferta&sort=discount%3Adesc&count=50&page=1&locale=es-CL', {credentials:'include'});
                             if (!r.ok) return JSON.stringify({error: r.status});
                             return r.text();
                         } catch(e) { return JSON.stringify({error: e.message}); }
