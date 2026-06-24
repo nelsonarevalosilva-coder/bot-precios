@@ -205,6 +205,22 @@ def _send(text: str, chat_id=None) -> bool:
     return resp.status_code == 200
 
 
+def _send_with_image(text: str, image_url: str, chat_id: int) -> bool:
+    if image_url:
+        try:
+            caption = text[:1024]
+            resp = requests.post(
+                f"{TELEGRAM_API}/sendPhoto",
+                json={"chat_id": chat_id, "photo": image_url, "caption": caption, "parse_mode": "HTML"},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
+    return _send(text, chat_id=chat_id)
+
+
 def notify_price_drop(product_name: str, url: str, old_price: int, new_price: int):
     diff = old_price - new_price
     pct = (diff / old_price) * 100
@@ -274,6 +290,7 @@ def notify_price_error(product, min_data=None, last_prices=None) -> bool:
     """Alerta especial para posibles errores de precio (>= 80% descuento)."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
+    image_url = getattr(product, "image_url", "")
     channel = get_channel_for_product(product)
     hist = _history_block(product.sale_price, min_data, last_prices or [])
 
@@ -289,8 +306,8 @@ def notify_price_error(product, min_data=None, last_prices=None) -> bool:
             f"⚠️ <i>Precio probablemente incorrecto — compra ahora antes de que lo corrijan</i>\n"
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
-        ok = _send(text, chat_id=channel)
-        _send(text, chat_id=PRICE_ERROR_CHANNEL)
+        ok = _send_with_image(text, image_url, channel)
+        _send_with_image(text, image_url, PRICE_ERROR_CHANNEL)
         if ok:
             print(f"  → ERROR EXTREMO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + productos")
         return ok
@@ -306,8 +323,8 @@ def notify_price_error(product, min_data=None, last_prices=None) -> bool:
             f"⚡ <i>Compra antes de que lo corrijan</i>\n"
             f"🔗 <a href=\"{product.url}\">Comprar ahora</a>"
         )
-    ok = _send(text, chat_id=channel)
-    _send(text, chat_id=PRICE_ERROR_CHANNEL)
+    ok = _send_with_image(text, image_url, channel)
+    _send_with_image(text, image_url, PRICE_ERROR_CHANNEL)
     if ok:
         print(f"  → ERROR PRECIO enviado: {product.name} ({product.discount_pct:.0f}% off) → canal {channel} + productos")
     return ok
@@ -317,6 +334,7 @@ def notify_big_discount(product, min_data=None, last_prices=None) -> bool:
     """Alerta de descuento encontrado en el catálogo."""
     savings = product.normal_price - product.sale_price
     store = getattr(product, "store", "Ripley")
+    image_url = getattr(product, "image_url", "")
     channel = get_channel_for_product(product)
     hist = _history_block(product.sale_price, min_data, last_prices or [])
     text = (
@@ -329,7 +347,7 @@ def notify_big_discount(product, min_data=None, last_prices=None) -> bool:
         f"{hist}\n\n"
         f"🔗 <a href=\"{product.url}\">Ver oferta</a>"
     )
-    ok = _send(text, chat_id=channel)
+    ok = _send_with_image(text, image_url, channel)
     if ok:
         print(f"  → Alerta enviada: {product.name} ({product.discount_pct:.0f}% off) → canal {channel}")
     return ok

@@ -59,6 +59,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Mercado Libre"
+    image_url: str = ""
 
 
 def _clean_price_from_aria(label: str) -> int | None:
@@ -153,6 +154,15 @@ def _parse_cards(html: str, category_name: str, min_discount: float, debug: bool
             seen.add(url)
             category = _infer_category(name)
 
+            img_tag = card.find("img", class_=re.compile(r"poly-component__picture|poly.*image", re.I))
+            if not img_tag:
+                img_tag = card.find("img")
+            image_url = ""
+            if img_tag:
+                image_url = img_tag.get("src") or img_tag.get("data-src") or ""
+                if image_url.startswith("data:"):
+                    image_url = img_tag.get("data-src") or ""
+
             if debug:
                 print(f"    {name[:55]} | ${sale:,} (normal ${normal:,}) {discount_pct:.0f}% | {category}")
 
@@ -164,6 +174,7 @@ def _parse_cards(html: str, category_name: str, min_discount: float, debug: bool
                 discount_pct=round(discount_pct, 1),
                 category=category,
                 store="Mercado Libre",
+                image_url=image_url,
             ))
         except Exception:
             continue

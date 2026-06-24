@@ -27,6 +27,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Bata"
+    image_url: str = ""
 
 
 def _clean_price(val) -> int | None:
@@ -49,6 +50,7 @@ def _parse_shopify_json(data, category_name: str, min_discount: float, seen: set
                 continue
             name = p.get("title", "")
             product_url = f"{BASE_URL}/products/{handle}"
+            image_url = (p.get("images") or [{}])[0].get("src", "")
 
             best_sale = best_normal = 0
             best_discount = 0.0
@@ -75,6 +77,7 @@ def _parse_shopify_json(data, category_name: str, min_discount: float, seen: set
                 normal_price=best_normal, sale_price=best_sale,
                 discount_pct=round(best_discount, 1),
                 category=category_name, store="Bata",
+                image_url=image_url,
             ))
         except Exception:
             continue

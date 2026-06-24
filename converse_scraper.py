@@ -27,6 +27,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Converse"
+    image_url: str = ""
 
 
 def _clean_price(val) -> int | None:
@@ -55,10 +56,12 @@ def _parse_vtex(data, category_name, min_discount, seen):
             pr = p.get("priceRange", {})
             normal = _clean_price((pr.get("listPrice") or {}).get("highPrice"))
             sale = _clean_price((pr.get("sellingPrice") or {}).get("lowPrice"))
+            item0 = (p.get("items") or [{}])[0]
             if not normal or not sale:
-                offer = (p.get("items") or [{}])[0].get("sellers", [{}])[0].get("commertialOffer", {})
+                offer = (item0.get("sellers") or [{}])[0].get("commertialOffer", {})
                 normal = _clean_price(offer.get("ListPrice"))
                 sale = _clean_price(offer.get("Price"))
+            image_url = (item0.get("images") or [{}])[0].get("imageUrl", "")
             if not normal or not sale or normal <= sale:
                 continue
             disc = (normal - sale) / normal * 100
@@ -66,7 +69,7 @@ def _parse_vtex(data, category_name, min_discount, seen):
                 continue
             results.append(Product(name=name[:120], url=url, normal_price=normal,
                                    sale_price=sale, discount_pct=round(disc, 1),
-                                   category=category_name, store="Converse"))
+                                   category=category_name, store="Converse", image_url=image_url))
         except Exception:
             continue
     return results

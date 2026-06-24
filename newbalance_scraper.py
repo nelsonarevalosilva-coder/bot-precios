@@ -26,6 +26,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "New Balance"
+    image_url: str = ""
 
 
 def _clean_price(val) -> int | None:
@@ -46,6 +47,7 @@ def _parse_shopify_json(data, category_name, min_discount, seen):
                 continue
             name = p.get("title", "")
             product_url = f"{BASE_URL}/products/{handle}"
+            image_url = (p.get("images") or [{}])[0].get("src", "")
             best_sale = best_normal = 0
             best_disc = 0.0
             for v in p.get("variants", []):
@@ -64,7 +66,7 @@ def _parse_shopify_json(data, category_name, min_discount, seen):
             seen.add(handle)
             results.append(Product(name=name[:120], url=product_url, normal_price=best_normal,
                                    sale_price=best_sale, discount_pct=round(best_disc, 1),
-                                   category=category_name, store="New Balance"))
+                                   category=category_name, store="New Balance", image_url=image_url))
         except Exception:
             continue
     return results

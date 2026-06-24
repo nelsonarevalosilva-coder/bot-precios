@@ -24,6 +24,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Shopify"
+    image_url: str = ""
 
 
 def _base_url(collection_url: str) -> str:
@@ -69,6 +70,7 @@ def _shopify_scrape(
 
                 name = p.get("title", "")
                 product_url = f"{base}/products/{handle}"
+                image_url = (p.get("images") or [{}])[0].get("src", "")
 
                 best_sale = best_normal = 0
                 best_discount = 0.0
@@ -106,6 +108,7 @@ def _shopify_scrape(
                     discount_pct=round(best_discount, 1),
                     category=category_name,
                     store=store_name,
+                    image_url=image_url,
                 ))
 
             if debug:

@@ -25,6 +25,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "VTEX"
+    image_url: str = ""
 
 
 def _vtex_scrape(
@@ -72,6 +73,7 @@ def _vtex_scrape(
                 offer = (item.get("sellers") or [{}])[0].get("commertialOffer", {})
                 list_price = int(offer.get("ListPrice") or 0)
                 sale_price = int(offer.get("Price") or 0)
+                image_url = (item.get("images") or [{}])[0].get("imageUrl", "")
 
                 if not list_price or not sale_price or list_price <= sale_price:
                     continue
@@ -88,6 +90,7 @@ def _vtex_scrape(
                     discount_pct=round(discount_pct, 1),
                     category=category_name,
                     store=store_name,
+                    image_url=image_url,
                 ))
 
             if debug:
