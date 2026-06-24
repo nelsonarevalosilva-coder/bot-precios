@@ -40,9 +40,20 @@ def _clean_price(val) -> int | None:
 
 def _parse_vtex(data, category_name, min_discount, seen):
     results = []
-    products = data if isinstance(data, list) else data.get("products", [])
+    products = data if isinstance(data, list) else []
     if not products:
-        products = data.get("data", {}).get("productSearch", {}).get("products", [])
+        # VTEX REST
+        products = data.get("products", [])
+    if not products:
+        # VTEX GraphQL — varios posibles paths
+        d = data.get("data", {})
+        products = (d.get("productSearch") or d.get("search") or d.get("productList") or {}).get("products", [])
+    if not products:
+        # GraphQL con extensions
+        for val in data.get("data", {}).values() if isinstance(data.get("data"), dict) else []:
+            if isinstance(val, dict) and "products" in val:
+                products = val["products"]
+                break
     for p in products:
         try:
             pid = str(p.get("productId") or p.get("productReference") or "")
@@ -87,9 +98,7 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
         try:
             ct = resp.headers.get("content-type", "")
             if resp.status == 200 and "json" in ct and "nike.cl" in resp.url:
-                if debug:
-                    print(f"  [nike] JSON: {resp.url[:100]}")
-                if any(k in resp.url for k in ["catalog_system", "intelligent-search", "product_search", "search"]):
+                if any(k in resp.url for k in ["graphql", "catalog_system", "intelligent-search", "product_search"]):
                     body = resp.json()
                     if body:
                         api_responses.append(body)
@@ -137,15 +146,11 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
         logging.error("[nike] Error general: %s", e)
 
     for i, data in enumerate(api_responses):
-        products_in = data if isinstance(data, list) else data.get("products", [])
-        if not products_in:
-            products_in = data.get("data", {}).get("productSearch", {}).get("products", [])
         if debug:
-            print(f"  [nike] Respuesta {i+1}: {len(products_in)} productos en raw")
-            if products_in:
-                p0 = products_in[0]
-                pr = p0.get("priceRange", {})
-                print(f"    Ejemplo: {p0.get('productName','?')[:50]} | listPrice={pr.get('listPrice',{})} | sellingPrice={pr.get('sellingPrice',{})}")
+            keys = list(data.keys()) if isinstance(data, dict) else "list"
+            print(f"  [nike] Respuesta {i+1}: keys={keys}")
+            if isinstance(data, dict) and "data" in data:
+                print(f"    data keys: {list(data['data'].keys())}")
         all_products.extend(_parse_vtex(data, category_name, min_discount, seen))
 
     if debug:
