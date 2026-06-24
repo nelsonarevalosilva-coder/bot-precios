@@ -170,22 +170,32 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=5, debug=Fa
 
                 # 2. Fetch API desde dentro del browser (usa cookies Cloudflare ya establecidas)
                 try:
-                    api_json = page.evaluate("""async () => {
-                        try {
-                            const r = await fetch('/api/intelligent-search/product_search?query=oferta&sort=discount%3Adesc&count=50&page=1&locale=es-CL', {credentials:'include'});
-                            if (!r.ok) return JSON.stringify({error: r.status});
-                            return r.text();
-                        } catch(e) { return JSON.stringify({error: e.message}); }
-                    }""")
-                    if debug:
-                        print(f"  [nike] in-browser fetch: {str(api_json)[:120]}")
-                    if api_json and '"error"' not in api_json[:30]:
-                        products = json.loads(api_json)
-                        if isinstance(products, list):
-                            found = _parse_vtex({"products": products}, category_name, min_discount, seen)
+                    # Probar múltiples endpoints hasta encontrar productos
+                    endpoints = [
+                        '/api/intelligent-search/product_search?sort=discount%3Adesc&count=50&page=1&locale=es-CL&selectedFacets=%5B%5D',
+                        '/api/intelligent-search/product_search?query=descuento&sort=discount%3Adesc&count=50&page=1&locale=es-CL',
+                        '/api/catalog_system/pub/products/search?O=OrderByBestDiscountDESC&_from=0&_to=49',
+                    ]
+                    for ep in endpoints:
+                        api_json = page.evaluate(f"""async () => {{
+                            try {{
+                                const r = await fetch('{ep}', {{credentials:'include'}});
+                                if (!r.ok) return JSON.stringify({{error: r.status}});
+                                return r.text();
+                            }} catch(e) {{ return JSON.stringify({{error: e.message}}); }}
+                        }}""")
+                        if debug:
+                            print(f"  [nike] fetch {ep[:60]}: {str(api_json)[:80]}")
+                        if not api_json or '"error"' in api_json[:20]:
+                            continue
+                        data = json.loads(api_json)
+                        products = data.get("products", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                        if products:
+                            found = _parse_vtex({"products": products} if not isinstance(data, list) else data, category_name, min_discount, seen)
                             if debug:
-                                print(f"  [nike] fetch productos: {len(products)} raw, {len(found)} con desc")
+                                print(f"  [nike] {len(products)} raw, {len(found)} con desc >= {min_discount}%")
                             all_products.extend(found)
+                            break
                 except Exception as e:
                     if debug:
                         print(f"  [nike] fetch error: {e}")
