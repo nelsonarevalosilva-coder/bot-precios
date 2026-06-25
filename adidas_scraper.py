@@ -123,7 +123,11 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
                 page.wait_for_timeout(3000)
 
                 if debug:
-                    print(f"  [adidas] {page.title()[:60]}")
+                    title = page.title()
+                    body_text = page.evaluate("() => document.body ? document.body.innerText.slice(0,200) : ''")
+                    has_next = page.evaluate("() => !!window.__NEXT_DATA__")
+                    print(f"  [adidas] title={title[:50]} | __NEXT_DATA__={has_next}")
+                    print(f"  [adidas] body: {body_text[:150]}")
 
                 # 1. Intentar __NEXT_DATA__ (Next.js)
                 try:
