@@ -1,6 +1,5 @@
 """
 Scraper para Adidas Chile — undetected-chromedriver bypasea Akamai.
-Parchea Chrome a nivel binario para que Akamai no detecte automatizacion.
 """
 import json
 import logging
@@ -101,6 +100,21 @@ def _deep_extract(data, category_name, min_discount, seen):
     return []
 
 
+def _make_options():
+    """Siempre crear un objeto ChromeOptions nuevo — no reutilizar."""
+    opts = uc.ChromeOptions()
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-gpu")
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-software-rasterizer")
+    opts.add_argument("--lang=es-CL")
+    opts.add_argument("--window-size=1920,1080")
+    opts.add_argument("--no-first-run")
+    opts.add_argument("--no-default-browser-check")
+    return opts
+
+
 def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=False):
     logging.info("[adidas] Iniciando: %s | uc=%s", category_name, _HAS_UC)
 
@@ -111,30 +125,7 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
     all_products, seen = [], set()
 
     try:
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--lang=es-CL")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-gpu")
-
-        # Intentar primero con headless, si falla usar visible
-        for headless_mode in [True, False]:
-            try:
-                driver = uc.Chrome(
-                    options=options,
-                    headless=headless_mode,
-                    version_main=None,
-                )
-                break
-            except Exception as e:
-                logging.warning("[adidas] Chrome headless=%s falló: %s", headless_mode, e)
-                if not headless_mode:
-                    raise
-        else:
-            logging.error("[adidas] No se pudo iniciar Chrome")
-            return []
-
+        driver = uc.Chrome(options=_make_options(), headless=True, version_main=None)
         try:
             driver.get(BASE_URL)
             time.sleep(3)
@@ -145,17 +136,16 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
             title = driver.title
             body = driver.find_element("tag name", "body").text[:300]
             blocked = any(w in body for w in [
-                "UNABLE TO GIVE YOU ACCESS", "security issue", "Reference #"
+                "UNABLE TO GIVE YOU ACCESS", "security issue", "Reference #",
             ])
 
             if debug:
                 print(f"  [adidas] title={title[:50]} | blocked={blocked}")
 
             if blocked:
-                logging.warning("[adidas] Bloqueado por Akamai en %s", category_name)
+                logging.warning("[adidas] Akamai bloqueó %s", category_name)
                 return []
 
-            # Scroll
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight * 0.5)")
             time.sleep(2)
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
@@ -172,37 +162,37 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
             except Exception:
                 pass
 
-            # 2. In-browser fetch si __NEXT_DATA__ no tiene productos
+            # 2. In-browser fetch usando execute_async_script
             if not all_products:
                 path = url.replace(BASE_URL, "").strip("/")
-                for ep in [
-                    f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc",
-                    f"/es-CL/plp-app/api/products?path=/{path}&start=0&count=48",
-                ]:
-                    try:
-                        result = driver.execute_script(f"""
-                            const r = await fetch('{ep}', {{
-                                credentials: 'include',
-                                headers: {{'Accept': 'application/json'}}
-                            }});
-                            return r.ok ? await r.text() : JSON.stringify({{error: r.status}});
-                        """)
-                        if result and '"error"' not in str(result)[:20]:
-                            found = _deep_extract(json.loads(result), category_name, min_discount, seen)
-                            if debug:
-                                print(f"  [adidas] fetch {ep[:50]}: {len(found)} productos")
-                            all_products.extend(found)
-                            if all_products:
-                                break
-                    except Exception as fe:
+                ep = f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc"
+                try:
+                    driver.set_script_timeout(20)
+                    result = driver.execute_async_script(f"""
+                        var done = arguments[arguments.length - 1];
+                        fetch('{ep}', {{
+                            credentials: 'include',
+                            headers: {{'Accept': 'application/json'}}
+                        }})
+                        .then(function(r) {{ return r.ok ? r.text() : JSON.stringify({{error:r.status}}); }})
+                        .then(function(t) {{ done(t); }})
+                        .catch(function(e) {{ done(JSON.stringify({{error:e.message}})); }});
+                    """)
+                    if result and '"error"' not in str(result)[:20]:
+                        found = _deep_extract(json.loads(result), category_name, min_discount, seen)
                         if debug:
-                            print(f"  [adidas] fetch error: {fe}")
+                            print(f"  [adidas] fetch: {len(found)} productos")
+                        all_products.extend(found)
+                except Exception as fe:
+                    if debug:
+                        print(f"  [adidas] fetch error: {fe}")
 
         finally:
             try:
                 driver.quit()
             except Exception:
                 pass
+            time.sleep(2)
 
     except Exception as e:
         logging.error("[adidas] Error general: %s", e)
