@@ -1,7 +1,6 @@
 """
-Scraper para Adidas Chile.
-Usa headless=False para evadir Akamai Bot Manager (detecta headless).
-En servidor Windows funciona aunque no haya sesión activa de escritorio.
+Scraper para Adidas Chile — undetected-chromedriver bypasea Akamai.
+Parchea Chrome a nivel binario para que Akamai no detecte automatizacion.
 """
 import json
 import logging
@@ -9,13 +8,11 @@ import re
 import time
 from dataclasses import dataclass
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-
 try:
-    from playwright_stealth import stealth_sync
-    _HAS_STEALTH = True
-except ImportError:
-    _HAS_STEALTH = False
+    import undetected_chromedriver as uc
+    _HAS_UC = True
+except Exception:
+    _HAS_UC = False
 
 BASE_URL = "https://www.adidas.cl"
 
@@ -105,115 +102,112 @@ def _deep_extract(data, category_name, min_discount, seen):
 
 
 def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=False):
-    logging.info("[adidas] Iniciando: %s", category_name)
+    logging.info("[adidas] Iniciando: %s | uc=%s", category_name, _HAS_UC)
+
+    if not _HAS_UC:
+        logging.error("[adidas] undetected-chromedriver no disponible")
+        return []
+
     all_products, seen = [], set()
 
-    # headless=False: Akamai no detecta el browser como bot
-    for attempt in range(2):
-        headless = (attempt == 1)  # intento 0: visible, intento 1: headless fallback
-        try:
-            with sync_playwright() as pw:
-                try:
-                    browser = pw.chromium.launch(
-                        headless=headless,
-                        args=[
-                            "--no-sandbox",
-                            "--disable-blink-features=AutomationControlled",
-                            "--disable-dev-shm-usage",
-                            "--start-maximized",
-                        ],
-                    )
-                except Exception as e:
-                    logging.error("[adidas] No se pudo lanzar browser (headless=%s): %s", headless, e)
-                    continue
+    try:
+        options = uc.ChromeOptions()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--lang=es-CL")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-gpu")
 
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    locale="es-CL",
-                    viewport={"width": 1920, "height": 1080},
-                    extra_http_headers={"Accept-Language": "es-CL,es;q=0.9"},
+        # Intentar primero con headless, si falla usar visible
+        for headless_mode in [True, False]:
+            try:
+                driver = uc.Chrome(
+                    options=options,
+                    headless=headless_mode,
+                    version_main=None,
                 )
-                page = context.new_page()
-                if _HAS_STEALTH:
-                    stealth_sync(page)
+                break
+            except Exception as e:
+                logging.warning("[adidas] Chrome headless=%s falló: %s", headless_mode, e)
+                if not headless_mode:
+                    raise
+        else:
+            logging.error("[adidas] No se pudo iniciar Chrome")
+            return []
 
-                try:
-                    # Warmup en home
-                    page.goto(BASE_URL, wait_until="domcontentloaded", timeout=30000)
-                    page.wait_for_timeout(3000)
+        try:
+            driver.get(BASE_URL)
+            time.sleep(3)
 
-                    page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                    page.wait_for_timeout(5000)
+            driver.get(url)
+            time.sleep(5)
 
-                    title = page.title()
-                    body_snippet = page.inner_text("body")[:200].replace("\n", " ")
-                    blocked = any(w in body_snippet for w in [
-                        "UNABLE TO GIVE YOU ACCESS", "Access Denied",
-                        "Reference #", "security issue",
-                    ])
+            title = driver.title
+            body = driver.find_element("tag name", "body").text[:300]
+            blocked = any(w in body for w in [
+                "UNABLE TO GIVE YOU ACCESS", "security issue", "Reference #"
+            ])
+
+            if debug:
+                print(f"  [adidas] title={title[:50]} | blocked={blocked}")
+
+            if blocked:
+                logging.warning("[adidas] Bloqueado por Akamai en %s", category_name)
+                return []
+
+            # Scroll
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * 0.5)")
+            time.sleep(2)
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+            time.sleep(3)
+
+            # 1. __NEXT_DATA__
+            try:
+                nxt = driver.execute_script("return JSON.stringify(window.__NEXT_DATA__ || null)")
+                if nxt and nxt != "null":
+                    found = _deep_extract(json.loads(nxt), category_name, min_discount, seen)
                     if debug:
-                        print(f"  [adidas] headless={headless} | title={title[:50]} | blocked={blocked}")
+                        print(f"  [adidas] __NEXT_DATA__: {len(found)} productos")
+                    all_products.extend(found)
+            except Exception:
+                pass
 
-                    if blocked:
-                        browser.close()
-                        continue  # intenta con headless=True
-
-                    # Scroll para cargar productos
-                    page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.4)")
-                    page.wait_for_timeout(2000)
-                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    page.wait_for_timeout(3000)
-
-                    # 1. __NEXT_DATA__
+            # 2. In-browser fetch si __NEXT_DATA__ no tiene productos
+            if not all_products:
+                path = url.replace(BASE_URL, "").strip("/")
+                for ep in [
+                    f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc",
+                    f"/es-CL/plp-app/api/products?path=/{path}&start=0&count=48",
+                ]:
                     try:
-                        nxt = page.evaluate("() => JSON.stringify(window.__NEXT_DATA__ || null)")
-                        if nxt and nxt != "null":
-                            found = _deep_extract(json.loads(nxt), category_name, min_discount, seen)
+                        result = driver.execute_script(f"""
+                            const r = await fetch('{ep}', {{
+                                credentials: 'include',
+                                headers: {{'Accept': 'application/json'}}
+                            }});
+                            return r.ok ? await r.text() : JSON.stringify({{error: r.status}});
+                        """)
+                        if result and '"error"' not in str(result)[:20]:
+                            found = _deep_extract(json.loads(result), category_name, min_discount, seen)
                             if debug:
-                                print(f"  [adidas] __NEXT_DATA__: {len(found)} productos")
+                                print(f"  [adidas] fetch {ep[:50]}: {len(found)} productos")
                             all_products.extend(found)
-                    except Exception:
-                        pass
+                            if all_products:
+                                break
+                    except Exception as fe:
+                        if debug:
+                            print(f"  [adidas] fetch error: {fe}")
 
-                    # 2. In-browser fetch a content-engine
-                    if not all_products:
-                        path = url.replace(BASE_URL, "").strip("/")
-                        for ep in [
-                            f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc",
-                            f"/es-CL/plp-app/api/products?path=/{path}&start=0&count=48",
-                        ]:
-                            try:
-                                result = page.evaluate(f"""async () => {{
-                                    const r = await fetch('{ep}', {{credentials:'include', headers:{{'Accept':'application/json'}}}});
-                                    return r.ok ? await r.text() : JSON.stringify({{error:r.status}});
-                                }}""")
-                                if result and '"error"' not in result[:20]:
-                                    found = _deep_extract(json.loads(result), category_name, min_discount, seen)
-                                    if debug:
-                                        print(f"  [adidas] fetch {ep[:50]}: {len(found)} productos")
-                                    all_products.extend(found)
-                                    if all_products:
-                                        break
-                            except Exception:
-                                pass
+        finally:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
-                except PlaywrightTimeout:
-                    logging.warning("[adidas] Timeout en %s", category_name)
-                except Exception as e:
-                    logging.error("[adidas] Error navegando: %s", e)
-                finally:
-                    try:
-                        browser.close()
-                    except Exception:
-                        pass
+    except Exception as e:
+        logging.error("[adidas] Error general: %s", e)
 
-            if all_products or not blocked:
-                break  # no reintentar si funcionó o si no hubo bloqueo
-
-        except Exception as e:
-            logging.error("[adidas] Error general (headless=%s): %s", headless, e)
-
+    logging.info("[adidas] %s: %d productos >= %.0f%%", category_name, len(all_products), min_discount)
     if debug:
         print(f"  [adidas] Total: {len(all_products)} productos >= {min_discount:.0f}%")
-    logging.info("[adidas] %s: %d productos >= %.0f%%", category_name, len(all_products), min_discount)
     return all_products
