@@ -125,7 +125,7 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
     all_products, seen = [], set()
 
     try:
-        driver = uc.Chrome(options=_make_options(), headless=True, version_main=None)
+        driver = uc.Chrome(options=_make_options(), headless=True, version_main=149)
         try:
             driver.get(BASE_URL)
             time.sleep(3)
