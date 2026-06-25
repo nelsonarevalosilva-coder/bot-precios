@@ -94,18 +94,14 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
 
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True, args=[
-                "--no-sandbox", "--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"
-            ])
+            browser = pw.firefox.launch(headless=True)
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
                 locale="es-CL",
                 viewport={"width": 1920, "height": 1080},
                 extra_http_headers={"Accept-Language": "es-CL,es;q=0.9"},
             )
             page = context.new_page()
-            if _HAS_STEALTH:
-                stealth_sync(page)
 
             try:
                 # Warmup en home
