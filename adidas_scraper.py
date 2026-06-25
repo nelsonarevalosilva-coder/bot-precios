@@ -1,19 +1,20 @@
 """
-Scraper para Adidas Chile — Playwright + __NEXT_DATA__ + fetch in-browser.
-Adidas usa Akamai Bot Manager y Next.js.
+Scraper para Adidas Chile — undetected-chromedriver bypasea Akamai.
 """
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-
 try:
-    from playwright_stealth import stealth_sync
-    _HAS_STEALTH = True
+    import undetected_chromedriver as uc
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    _HAS_UC = True
 except ImportError:
-    _HAS_STEALTH = False
+    _HAS_UC = False
 
 BASE_URL = "https://www.adidas.cl"
 
@@ -45,20 +46,14 @@ def _parse_items(items, category_name, min_discount, seen):
         try:
             model_id = item.get("modelId") or item.get("id") or item.get("productId") or ""
             name = (item.get("displayName") or item.get("name") or item.get("title") or "").strip()
-            if not name or not model_id:
-                continue
-            if model_id in seen:
+            if not name or not model_id or model_id in seen:
                 continue
             product_url = f"{BASE_URL}/{model_id}.html"
             pricing = item.get("pricing") or item.get("price") or {}
             sale = _clean_price(pricing.get("currentPrice") or pricing.get("sale") or pricing.get("salePrice") or item.get("salePrice"))
             normal = _clean_price(pricing.get("standardPrice") or pricing.get("original") or pricing.get("originalPrice") or item.get("originalPrice"))
-            image_url = ""
             imgs = item.get("image") or item.get("images") or {}
-            if isinstance(imgs, dict):
-                image_url = imgs.get("src") or imgs.get("url") or ""
-            elif isinstance(imgs, list) and imgs:
-                image_url = imgs[0].get("src") or imgs[0].get("url") or ""
+            image_url = (imgs.get("src") or imgs.get("url") or "") if isinstance(imgs, dict) else (imgs[0].get("src", "") if imgs else "")
             if not sale or not normal or normal <= sale:
                 continue
             disc = (normal - sale) / normal * 100
@@ -78,103 +73,92 @@ def _extract_from_data(data, category_name, min_discount, seen):
         return []
     items = (data.get("raw", {}).get("itemList", {}).get("items") or
              data.get("itemList", {}).get("items") or
-             data.get("products") or
-             data.get("items") or [])
-    if not items:
-        for v in data.values():
-            if isinstance(v, dict):
-                items = _extract_from_data(v, category_name, min_discount, seen)
-                if items:
-                    return items
-    return _parse_items(items, category_name, min_discount, seen)
+             data.get("products") or data.get("items") or [])
+    if items:
+        return _parse_items(items, category_name, min_discount, seen)
+    for v in data.values():
+        if isinstance(v, dict):
+            result = _extract_from_data(v, category_name, min_discount, seen)
+            if result:
+                return result
+    return []
 
 
 def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=False):
+    logging.info("[adidas] Iniciando scrape: %s | uc=%s", category_name, _HAS_UC)
+    if debug:
+        print(f"  [adidas] scrape_category llamado: {category_name} | uc={_HAS_UC}")
+
+    if not _HAS_UC:
+        logging.error("[adidas] undetected-chromedriver no instalado. Corre: pip install undetected-chromedriver")
+        return []
+
     all_products, seen = [], set()
 
     try:
-        with sync_playwright() as pw:
-            browser = pw.firefox.launch(headless=True)
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-                locale="es-CL",
-                viewport={"width": 1920, "height": 1080},
-                extra_http_headers={"Accept-Language": "es-CL,es;q=0.9"},
-            )
-            page = context.new_page()
+        options = uc.ChromeOptions()
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--lang=es-CL")
+        options.add_argument("--window-size=1920,1080")
 
+        driver = uc.Chrome(options=options, version_main=None)
+        try:
+            # Warmup en home
+            driver.get(BASE_URL)
+            time.sleep(3)
+
+            driver.get(url)
+            time.sleep(5)
+
+            # Scroll para cargar productos
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * 0.5)")
+            time.sleep(2)
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+            time.sleep(3)
+
+            title = driver.title
+            if debug:
+                print(f"  [adidas] title={title[:60]}")
+
+            # 1. Intentar __NEXT_DATA__
             try:
-                # Warmup en home
-                try:
-                    page.goto(BASE_URL, wait_until="domcontentloaded", timeout=30000)
-                    page.wait_for_timeout(3000)
-                except Exception:
-                    pass
-
-                page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                page.wait_for_timeout(5000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
-                page.wait_for_timeout(2000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(3000)
-
+                next_json = driver.execute_script("return JSON.stringify(window.__NEXT_DATA__ || null)")
+                if next_json and next_json != "null":
+                    next_data = json.loads(next_json)
+                    found = _extract_from_data(next_data, category_name, min_discount, seen)
+                    if debug:
+                        print(f"  [adidas] __NEXT_DATA__: {len(found)} productos")
+                    all_products.extend(found)
+            except Exception as e:
                 if debug:
-                    title = page.title()
-                    body_text = page.evaluate("() => document.body ? document.body.innerText.slice(0,200) : ''")
-                    has_next = page.evaluate("() => !!window.__NEXT_DATA__")
-                    print(f"  [adidas] title={title[:50]} | __NEXT_DATA__={has_next}")
-                    print(f"  [adidas] body: {body_text[:150]}")
+                    print(f"  [adidas] __NEXT_DATA__ error: {e}")
 
-                # 1. Intentar __NEXT_DATA__ (Next.js)
+            # 2. Fetch in-browser al content-engine
+            if not all_products:
+                path = url.replace(BASE_URL, "").strip("/")
+                ep = f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc"
                 try:
-                    next_json = page.evaluate("() => JSON.stringify(window.__NEXT_DATA__ || null)")
-                    if next_json and next_json != "null":
-                        next_data = json.loads(next_json)
-                        found = _extract_from_data(next_data, category_name, min_discount, seen)
-                        if debug:
-                            print(f"  [adidas] __NEXT_DATA__: {len(found)} productos")
+                    api_json = driver.execute_script(f"""
+                        const r = await fetch('{ep}', {{credentials:'include', headers:{{'Accept':'application/json'}}}});
+                        return r.ok ? await r.text() : JSON.stringify({{error: r.status}});
+                    """)
+                    if debug:
+                        print(f"  [adidas] fetch: {str(api_json)[:80]}")
+                    if api_json and '"error"' not in str(api_json)[:20]:
+                        data = json.loads(api_json)
+                        found = _extract_from_data(data, category_name, min_discount, seen)
                         all_products.extend(found)
                 except Exception as e:
                     if debug:
-                        print(f"  [adidas] __NEXT_DATA__ error: {e}")
+                        print(f"  [adidas] fetch error: {e}")
 
-                # 2. Fetch in-browser al content-engine API
-                if not all_products:
-                    path = url.replace(BASE_URL, "")
-                    endpoints = [
-                        f"/api/plp/content-engine?query={path.strip('/')}&start=0&count=48&sort=discount-desc",
-                        f"/es-CL/plp-app/api{path}?start=0&count=48&sort=discount-desc",
-                    ]
-                    for ep in endpoints:
-                        try:
-                            api_json = page.evaluate(f"""async () => {{
-                                const r = await fetch('{ep}', {{credentials:'include', headers:{{'Accept':'application/json'}}}});
-                                if (!r.ok) return JSON.stringify({{error: r.status}});
-                                return r.text();
-                            }}""")
-                            if debug:
-                                print(f"  [adidas] fetch {ep[:70]}: {str(api_json)[:80]}")
-                            if not api_json or '"error"' in api_json[:20]:
-                                continue
-                            data = json.loads(api_json)
-                            found = _extract_from_data(data, category_name, min_discount, seen)
-                            if found:
-                                if debug:
-                                    print(f"  [adidas] {len(found)} productos desde API")
-                                all_products.extend(found)
-                                break
-                        except Exception as e:
-                            if debug:
-                                print(f"  [adidas] fetch error: {e}")
+        finally:
+            driver.quit()
 
-            except PlaywrightTimeout:
-                logging.warning("[adidas] Timeout")
-            except Exception as e:
-                logging.error("[adidas] Error: %s", e)
-
-            browser.close()
     except Exception as e:
-        logging.error("[adidas] Error general: %s", e)
+        logging.error("[adidas] Error: %s", e)
 
     if debug:
         print(f"  [adidas] Total: {len(all_products)} productos >= {min_discount:.0f}%")

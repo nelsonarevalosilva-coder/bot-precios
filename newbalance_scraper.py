@@ -14,7 +14,7 @@ try:
 except ImportError:
     _HAS_STEALTH = False
 
-BASE_URL = "https://www.newbalancechile.cl"
+BASE_URL = "https://www.newbalance.cl"
 
 
 @dataclass
@@ -111,7 +111,7 @@ def scrape_category(url, category_name, min_discount=40.0, max_pages=3, debug=Fa
 
     def handle_response(resp):
         try:
-            if resp.status == 200 and "json" in resp.headers.get("content-type", "") and "newbalancechile.cl" in resp.url:
+            if resp.status == 200 and "json" in resp.headers.get("content-type", "") and "newbalance.cl" in resp.url:
                 body = resp.json()
                 if isinstance(body, dict) and "products" in body:
                     api_responses.append(body)
