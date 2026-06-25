@@ -1,13 +1,13 @@
 """
-Scraper para Under Armour Chile — Playwright con intercepción de red.
-Under Armour bloquea requests con 418; necesita browser real.
+Scraper para Under Armour Chile — Playwright + parseo HTML.
+UA bloquea requests con 418; Playwright navega y extrae precios del HTML renderizado.
 """
-import json
 import logging
 import re
 from dataclasses import dataclass
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from bs4 import BeautifulSoup
 
 try:
     from playwright_stealth import stealth_sync
@@ -39,47 +39,59 @@ def _clean_price(val) -> int | None:
     return int(digits) if digits and 2 < len(digits) < 9 else None
 
 
-def _parse_json_response(data, category_name: str, min_discount: float, seen: set) -> list[Product]:
-    """Parsea distintos formatos JSON que UA puede devolver."""
+def _parse_html(html: str, category_name: str, min_discount: float, seen: set) -> list[Product]:
+    soup = BeautifulSoup(html, "html.parser")
     results = []
-    items = []
-    if isinstance(data, list):
-        items = data
-    elif isinstance(data, dict):
-        items = (data.get("hits") or data.get("products") or data.get("items") or
-                 data.get("data", {}).get("products") or data.get("result", {}).get("hits") or [])
-    for p in items:
+
+    # UA SFCC usa product-tile o grid-tile con data-pid
+    tiles = (soup.find_all("div", attrs={"data-pid": True}) or
+             soup.find_all(class_=re.compile(r"product-tile|grid-tile|product-card", re.I)))
+
+    for tile in tiles:
         try:
-            pid = str(p.get("productId") or p.get("id") or p.get("objectID") or "")
-            if not pid or pid in seen:
+            pid = tile.get("data-pid") or tile.get("data-product-id") or ""
+            link_tag = tile.find("a", href=True)
+            if not link_tag:
                 continue
-            name = (p.get("name") or p.get("productName") or p.get("title") or "").strip()
+            href = link_tag["href"]
+            product_url = href if href.startswith("http") else f"{BASE_URL}{href}"
+            uid = pid or product_url
+            if uid in seen:
+                continue
+
+            name_tag = (tile.find(class_=re.compile(r"product-name|tile-name|pdp-name|product-title", re.I)) or
+                        tile.find(["h2", "h3", "h4"], class_=re.compile(r"name|title", re.I)))
+            name = name_tag.get_text(strip=True) if name_tag else link_tag.get_text(strip=True)
             if not name:
                 continue
-            link = p.get("url") or p.get("link") or p.get("pdpUrl") or ""
-            if not link:
-                slug = p.get("slug") or p.get("seoKeyword") or pid
-                link = f"/es-cl/{slug}"
-            url = link if link.startswith("http") else f"{BASE_URL}{link}"
-            price_obj = p.get("price") or p.get("prices") or p.get("priceRange") or {}
-            if isinstance(price_obj, dict):
-                sale = _clean_price(price_obj.get("sale") or price_obj.get("current") or
-                                    price_obj.get("salePrice") or price_obj.get("min"))
-                normal = _clean_price(price_obj.get("original") or price_obj.get("regular") or
-                                      price_obj.get("list") or price_obj.get("max") or
-                                      price_obj.get("msrp"))
-            else:
-                sale = _clean_price(price_obj)
-                normal = None
+
+            # UA muestra precio tachado (normal) y precio de venta (sale)
+            sale_tag = tile.find(class_=re.compile(r"price-sale|sale-price|price--sale|reduced", re.I))
+            normal_tag = tile.find(class_=re.compile(r"price-standard|regular-price|price--regular|strike|was-price|original", re.I))
+
+            if not sale_tag:
+                # Fallback: buscar dos spans de precio donde el segundo está tachado
+                prices = tile.find_all(class_=re.compile(r"price", re.I))
+                if len(prices) >= 2:
+                    sale_tag, normal_tag = prices[0], prices[1]
+
+            if not sale_tag:
+                continue
+
+            sale = _clean_price(sale_tag.get_text())
+            normal = _clean_price(normal_tag.get_text()) if normal_tag else None
+
             if not sale or not normal or normal <= sale:
                 continue
             disc = (normal - sale) / normal * 100
             if disc < min_discount:
                 continue
-            imgs = p.get("images") or p.get("image") or []
-            image_url = (imgs[0].get("src") or imgs[0].get("url") or "") if imgs and isinstance(imgs, list) else ""
-            seen.add(pid)
-            results.append(Product(name=name[:120], url=url, normal_price=normal,
+
+            img_tag = tile.find("img")
+            image_url = (img_tag.get("src") or img_tag.get("data-src") or "") if img_tag else ""
+
+            seen.add(uid)
+            results.append(Product(name=name[:120], url=product_url, normal_price=normal,
                                    sale_price=sale, discount_pct=round(disc, 1),
                                    category=category_name, store="Under Armour", image_url=image_url))
         except Exception:
@@ -91,17 +103,7 @@ def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
                     max_pages: int = 3, debug: bool = False) -> list[Product]:
     all_products: list[Product] = []
     seen: set = set()
-    api_responses: list = []
-
-    def handle_response(resp):
-        try:
-            ct = resp.headers.get("content-type", "")
-            if resp.status == 200 and "json" in ct and "underarmour.com" in resp.url:
-                body = resp.json()
-                if isinstance(body, (dict, list)) and body:
-                    api_responses.append(body)
-        except Exception:
-            pass
+    page_html: list[str] = []
 
     try:
         with sync_playwright() as pw:
@@ -117,39 +119,34 @@ def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
             page = context.new_page()
             if _HAS_STEALTH:
                 stealth_sync(page)
-            page.on("response", handle_response)
 
             try:
-                # Warmup en home para obtener cookies
-                page.goto(f"{BASE_URL}/es-cl/", wait_until="domcontentloaded", timeout=30000)
-                page.wait_for_timeout(2000)
-
                 page.goto(url, wait_until="domcontentloaded", timeout=45000)
                 page.wait_for_timeout(4000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
-                page.wait_for_timeout(2000)
+                # Scroll para cargar lazy-load de productos
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.3)")
+                page.wait_for_timeout(1500)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.6)")
+                page.wait_for_timeout(1500)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(3000)
+                page.wait_for_timeout(2000)
 
                 title = page.title()
-                if debug:
-                    print(f"  [under armour] {category_name}: {title[:60]} | responses: {len(api_responses)}")
+                html = page.content()
+                page_html.append(html)
 
-                # In-browser fetch si no se interceptaron respuestas útiles
-                if not all_products:
-                    path = url.replace(BASE_URL, "")
-                    try:
-                        api_json = page.evaluate("""async () => {
-                            const r = await fetch('/es-cl/search?q=&sz=48&format=ajax&srule=Most-Discounted', {credentials:'include'});
-                            return r.ok ? await r.text() : JSON.stringify({error: r.status});
-                        }""")
-                        if debug:
-                            print(f"  [under armour] fetch ajax: {str(api_json)[:80]}")
-                    except Exception:
-                        pass
+                if debug:
+                    soup = BeautifulSoup(html, "html.parser")
+                    tiles = (soup.find_all("div", attrs={"data-pid": True}) or
+                             soup.find_all(class_=re.compile(r"product-tile|product-card", re.I)))
+                    print(f"  [under armour] {category_name}: {title[:50]} | tiles: {len(tiles)}")
 
             except PlaywrightTimeout:
-                logging.warning("[under armour] Timeout en %s", category_name)
+                logging.warning("[under armour] Timeout en %s — usando lo capturado", category_name)
+                try:
+                    page_html.append(page.content())
+                except Exception:
+                    pass
             except Exception as e:
                 logging.error("[under armour] Error: %s", e)
 
@@ -158,10 +155,10 @@ def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
     except Exception as e:
         logging.error("[under armour] Error general: %s", e)
 
-    for data in api_responses:
-        found = _parse_json_response(data, category_name, min_discount, seen)
+    for html in page_html:
+        found = _parse_html(html, category_name, min_discount, seen)
         if found and debug:
-            print(f"  [under armour] {len(found)} productos desde API")
+            print(f"  [under armour] {len(found)} productos desde HTML")
         all_products.extend(found)
 
     if debug:
