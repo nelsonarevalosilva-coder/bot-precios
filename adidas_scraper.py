@@ -127,45 +127,26 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
     try:
         driver = uc.Chrome(options=_make_options(), headless=True, version_main=149)
         try:
+            # Solo cargar home — la URL de sale activa protección extra de Akamai
             driver.get(BASE_URL)
-            time.sleep(3)
-
-            driver.get(url)
             time.sleep(5)
 
             title = driver.title
-            body = driver.find_element("tag name", "body").text[:300]
-            blocked = any(w in body for w in [
-                "UNABLE TO GIVE YOU ACCESS", "security issue", "Reference #",
-            ])
-
             if debug:
-                print(f"  [adidas] title={title[:50]} | blocked={blocked}")
+                print(f"  [adidas] home title={title[:50]}")
 
-            if blocked:
-                logging.warning("[adidas] Akamai bloqueó %s", category_name)
-                return []
-
+            # Scroll en home para establecer sesión completa
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight * 0.5)")
             time.sleep(2)
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(3)
 
-            # 1. __NEXT_DATA__
-            try:
-                nxt = driver.execute_script("return JSON.stringify(window.__NEXT_DATA__ || null)")
-                if nxt and nxt != "null":
-                    found = _deep_extract(json.loads(nxt), category_name, min_discount, seen)
-                    if debug:
-                        print(f"  [adidas] __NEXT_DATA__: {len(found)} productos")
-                    all_products.extend(found)
-            except Exception:
-                pass
-
-            # 2. In-browser fetch usando execute_async_script
-            if not all_products:
-                path = url.replace(BASE_URL, "").strip("/")
-                ep = f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc"
+            # Fetch al API con las cookies de la home (no navegar a la URL de sale)
+            path = url.replace(BASE_URL, "").strip("/")
+            for ep in [
+                f"/api/plp/content-engine?query={path}&start=0&count=48&sort=discount-desc",
+                f"/api/plp/content-engine?start=0&count=48&sort=discount-desc&path=/{path}",
+            ]:
                 try:
                     driver.set_script_timeout(20)
                     result = driver.execute_async_script(f"""
@@ -178,11 +159,15 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
                         .then(function(t) {{ done(t); }})
                         .catch(function(e) {{ done(JSON.stringify({{error:e.message}})); }});
                     """)
+                    if debug:
+                        print(f"  [adidas] fetch {ep[:60]}: {str(result)[:80]}")
                     if result and '"error"' not in str(result)[:20]:
                         found = _deep_extract(json.loads(result), category_name, min_discount, seen)
                         if debug:
-                            print(f"  [adidas] fetch: {len(found)} productos")
+                            print(f"  [adidas] {len(found)} productos")
                         all_products.extend(found)
+                        if all_products:
+                            break
                 except Exception as fe:
                     if debug:
                         print(f"  [adidas] fetch error: {fe}")
