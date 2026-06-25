@@ -192,7 +192,14 @@ def scrape_category(url, category_name, min_discount=25.0, max_pages=3, debug=Fa
                 driver.quit()
             except Exception:
                 pass
-            time.sleep(2)
+            # Matar Chrome si sigue corriendo
+            try:
+                import subprocess
+                subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"], capture_output=True)
+                subprocess.run(["taskkill", "/F", "/IM", "chromedriver.exe"], capture_output=True)
+            except Exception:
+                pass
+            time.sleep(3)
 
     except Exception as e:
         logging.error("[adidas] Error general: %s", e)
