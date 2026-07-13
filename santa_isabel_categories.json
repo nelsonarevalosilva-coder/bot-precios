@@ -1,0 +1,19 @@
+[
+  {"name": "Ofertas del dia",                    "url": "https://www.santaisabel.cl/ofertas",                                                     "max_pages": 5},
+  {"name": "Carnes y Pescados",                  "url": "https://www.santaisabel.cl/carnes-y-pescados",                                           "max_pages": 3},
+  {"name": "Carnes - Vacuno",                    "url": "https://www.santaisabel.cl/carnes-y-pescados/vacuno",                                    "max_pages": 2},
+  {"name": "Carnes - Pollo",                     "url": "https://www.santaisabel.cl/carnes-y-pescados/pollo",                                     "max_pages": 2},
+  {"name": "Carnes - Cerdo y Cordero",           "url": "https://www.santaisabel.cl/carnes-y-pescados/cerdo-y-cordero",                          "max_pages": 2},
+  {"name": "Carnes - Pescados",                  "url": "https://www.santaisabel.cl/carnes-y-pescados/pescados",                                  "max_pages": 2},
+  {"name": "Lacteos Huevos Congelados",          "url": "https://www.santaisabel.cl/lacteos-huevos-y-congelados",                                "max_pages": 3},
+  {"name": "Lacteos - Leches",                   "url": "https://www.santaisabel.cl/lacteos-huevos-y-congelados/leches",                         "max_pages": 2},
+  {"name": "Lacteos - Helados y Postres",        "url": "https://www.santaisabel.cl/lacteos-huevos-y-congelados/helados-y-postres",              "max_pages": 2},
+  {"name": "Lacteos - Huevos",                   "url": "https://www.santaisabel.cl/lacteos-huevos-y-congelados/huevos",                         "max_pages": 2},
+  {"name": "Congelados",                         "url": "https://www.santaisabel.cl/congelados",                                                  "max_pages": 3},
+  {"name": "Frutas y Verduras",                  "url": "https://www.santaisabel.cl/frutas-y-verduras",                                           "max_pages": 2},
+  {"name": "Despensa",                           "url": "https://www.santaisabel.cl/despensa",                                                    "max_pages": 3},
+  {"name": "Despensa - Conservas",               "url": "https://www.santaisabel.cl/despensa/conservas",                                         "max_pages": 2},
+  {"name": "Limpieza",                           "url": "https://www.santaisabel.cl/limpieza",                                                    "max_pages": 3},
+  {"name": "Panaderia y Pasteleria",             "url": "https://www.santaisabel.cl/panaderia-y-pasteleria",                                     "max_pages": 2},
+  {"name": "Mascotas",                           "url": "https://www.santaisabel.cl/mascotas",                                                    "max_pages": 2}
+]

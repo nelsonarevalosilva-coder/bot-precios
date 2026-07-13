@@ -28,6 +28,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Sairam"
+    image_url: str = ""
 
 
 def _clean_price(text: str) -> int | None:

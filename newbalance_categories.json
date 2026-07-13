@@ -1,5 +1,5 @@
 [
-  {"name": "Sale General",  "url": "https://www.newbalance.cl/collections/sale"},
-  {"name": "Sale Hombre",   "url": "https://www.newbalance.cl/collections/sale-hombre"},
-  {"name": "Sale Mujer",    "url": "https://www.newbalance.cl/collections/sale-mujer"}
+  {"name": "Sale General",  "url": "https://newbalance.cl/sale.html"},
+  {"name": "Sale Hombre",   "url": "https://newbalance.cl/sale/hombre.html"},
+  {"name": "Sale Mujer",    "url": "https://newbalance.cl/sale/mujer.html"}
 ]

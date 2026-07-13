@@ -5,7 +5,16 @@
 prices.db
 
 # Logs
-monitor.log
+*.log
+
+# Bases de datos con datos de clientes
+subscriptions.db
+monitor.db
+
+# Sesiones y estado de scrapers
+ubereats_session.json
+ubereats_state.json
+rappi_state.json
 
 # Archivos temporales de desarrollo
 __pycache__/

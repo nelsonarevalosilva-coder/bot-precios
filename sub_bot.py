@@ -16,13 +16,14 @@ import requests
 from dotenv import load_dotenv
 
 from sub_config import CHANNELS, PLANS
-from sub_db import get_active_subscriptions, has_active_subscription, init_sub_db
+from sub_db import get_active_subscriptions, has_active_subscription, init_sub_db, add_subscription
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")
 WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "")
+OWNER_ID = int(os.getenv("OWNER_TELEGRAM_ID", "0"))
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -131,11 +132,103 @@ def create_mp_link(user_id, username, channel_key, plan_key):
     return url, None
 
 
+def create_invite_link(channel_id):
+    from datetime import datetime, timedelta
+    expire_date = int((datetime.now() + timedelta(hours=24)).timestamp())
+    resp = tg("createChatInviteLink", chat_id=channel_id, member_limit=1, expire_date=expire_date)
+    if resp.get("ok"):
+        return resp["result"]["invite_link"]
+    return None
+
+
+def handle_regalar(chat_id, owner_id, args_text):
+    """Comando /regalar <telegram_id> <canal_o_all> <dias>"""
+    if owner_id != OWNER_ID:
+        send(chat_id, "⛔ No tienes permiso para usar este comando.")
+        return
+
+    parts = args_text.strip().split()
+    if len(parts) != 3:
+        send(chat_id,
+            "⚠️ <b>Faltan argumentos.</b>\n\n"
+            "📋 <b>Uso correcto:</b>\n"
+            "<code>/regalar &lt;telegram_id&gt; &lt;canal&gt; &lt;días&gt;</code>\n\n"
+            "<b>Ejemplo:</b>\n"
+            "<code>/regalar 5700067936 all 30</code>\n\n"
+            "<b>Canales disponibles:</b>\n" +
+            "\n".join(f"• <code>{k}</code>" for k in list(CHANNELS.keys()) + ["all"])
+        )
+        return
+
+    try:
+        target_id = int(parts[0])
+    except ValueError:
+        send(chat_id, "❌ El telegram_id debe ser un número.")
+        return
+
+    channel_key = parts[1].lower()
+    try:
+        days = int(parts[2])
+    except ValueError:
+        send(chat_id, "❌ Los días deben ser un número.")
+        return
+
+    if channel_key != "all" and channel_key not in CHANNELS:
+        send(chat_id, f"❌ Canal '{channel_key}' no existe.\nUsa: {', '.join(CHANNELS.keys())} o all")
+        return
+
+    channels_to_activate = list(CHANNELS.items()) if channel_key == "all" else [(channel_key, CHANNELS[channel_key])]
+
+    invite_links = []
+    for key, ch in channels_to_activate:
+        link = create_invite_link(ch["id"])
+        if link:
+            add_subscription(
+                telegram_id=target_id,
+                telegram_user="regalo",
+                channel_key=key,
+                channel_id=ch["id"],
+                plan="regalo",
+                amount=0,
+                mp_payment_id="regalo",
+                invite_link=link,
+                days=days,
+            )
+            invite_links.append((ch["name"], link))
+
+    if not invite_links:
+        send(chat_id, "❌ No se pudieron generar los links de invitación. ¿El bot es admin en los canales?")
+        return
+
+    SEARCH_BOT = "https://t.me/Ofertas_search_bot"
+    if channel_key == "all":
+        msg = f"🎁 <b>¡Tienes acceso gratuito!</b>\n\n<b>Todos los canales — {days} días</b>\n\n"
+        for name, link in invite_links:
+            msg += f"• {name}: {link}\n"
+        msg += f"\n🔍 Buscador: {SEARCH_BOT}\n⏰ Links válidos por 24h."
+    else:
+        ch_name, link = invite_links[0]
+        msg = (
+            f"🎁 <b>¡Tienes acceso gratuito!</b>\n\n"
+            f"Canal: <b>{ch_name}</b> — {days} días\n\n"
+            f"👇 Link de acceso:\n{link}\n\n"
+            f"🔍 Buscador: {SEARCH_BOT}\n⏰ Link válido por 24h."
+        )
+
+    send(target_id, msg)
+    send(chat_id, f"✅ Membresía de {days} días enviada al usuario {target_id}.")
+    log.info(f"Regalo: owner → user {target_id} | {channel_key} | {days} días")
+
+
 def handle_message(msg):
     chat_id = msg["chat"]["id"]
     text = msg.get("text", "")
     user = msg.get("from", {})
     user_id = user.get("id")
+
+    if text.startswith("/regalar"):
+        args = text[len("/regalar"):].strip()
+        handle_regalar(chat_id, user_id, args)
 
     if text.startswith("/start") or text.startswith("/ayuda"):
         send(chat_id,

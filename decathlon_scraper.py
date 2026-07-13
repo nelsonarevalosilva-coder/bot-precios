@@ -1,6 +1,7 @@
 """
-Scraper para Decathlon Chile — Playwright + in-browser fetch a VTEX API.
-La URL de búsqueda no soporta paginación con &page=N; usamos la API de VTEX directamente.
+Scraper para Decathlon Chile — Playwright + parseo HTML PrestaShop/Oneshop.
+URLs de formato: /NUMERO-ofertas-CATEGORIA
+Clases de precio: price_amount (sale) y price_barred-amount (normal)
 """
 import json
 import logging
@@ -8,6 +9,7 @@ import re
 from dataclasses import dataclass
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from bs4 import BeautifulSoup
 
 try:
     from playwright_stealth import stealth_sync
@@ -39,72 +41,56 @@ def _clean_price(val) -> int | None:
     return int(digits) if digits and 2 < len(digits) < 9 else None
 
 
-def _parse_vtex(data, category_name: str, min_discount: float, seen: set) -> list[Product]:
+def _parse_html(html: str, category_name: str, min_discount: float, seen: set) -> list[Product]:
+    soup = BeautifulSoup(html, "html.parser")
     results = []
-    if isinstance(data, dict):
-        products = (data.get("products") or
-                    data.get("data", {}).get("productSearch", {}).get("products") or [])
-    elif isinstance(data, list):
-        products = data
-    else:
-        return results
-
-    for p in products:
+    for article in soup.find_all("article", class_="product-card"):
         try:
-            if "node" in p:
-                p = p["node"]
-            pid = str(p.get("productId") or p.get("id") or p.get("cacheId") or "")
-            if not pid or pid in seen:
+            sku = article.get("data-sku", "")
+            link_tag = article.find("a", class_=re.compile(r"js-product-card-link"))
+            if not link_tag:
                 continue
-            seen.add(pid)
-            name = (p.get("productName") or p.get("name") or "").strip()
+            product_url = link_tag.get("href", "")
+            if not product_url or product_url in seen:
+                continue
+            uid = sku or product_url
+            if uid in seen:
+                continue
+
+            img_tag = article.find("img")
+            name = img_tag.get("alt", "").strip() if img_tag else ""
+            image_url = img_tag.get("src", "") if img_tag else ""
             if not name:
                 continue
-            link = p.get("link") or p.get("linkText") or ""
-            if link and not link.startswith("http"):
-                link = f"{BASE_URL}/{link.lstrip('/')}/p"
-            if not link:
+
+            sale_tag = article.find(class_="price_amount")
+            normal_tag = article.find(class_="price_barred-amount")
+            if not sale_tag or not normal_tag:
                 continue
-            pr = p.get("priceRange") or {}
-            normal = _clean_price((pr.get("listPrice") or {}).get("highPrice") or
-                                  (pr.get("listPrice") or {}).get("lowPrice"))
-            sale = _clean_price((pr.get("sellingPrice") or {}).get("lowPrice") or
-                                (pr.get("sellingPrice") or {}).get("highPrice"))
-            if not normal or not sale:
-                offer = (p.get("items") or [{}])[0].get("sellers", [{}])[0].get("commertialOffer", {})
-                normal = _clean_price(offer.get("ListPrice"))
-                sale = _clean_price(offer.get("Price"))
-            items = p.get("items") or [{}]
-            image_url = (items[0].get("images") or [{}])[0].get("imageUrl", "")
-            if not normal or not sale or normal <= sale:
+            sale = _clean_price(sale_tag.get_text())
+            normal = _clean_price(normal_tag.get_text())
+            if not sale or not normal or normal <= sale:
                 continue
             disc = (normal - sale) / normal * 100
             if disc < min_discount:
                 continue
-            results.append(Product(name=name[:120], url=link, normal_price=normal,
-                                   sale_price=sale, discount_pct=round(disc, 1),
-                                   category=category_name, store="Decathlon", image_url=image_url))
+
+            seen.add(uid)
+            results.append(Product(
+                name=name[:120], url=product_url, normal_price=normal,
+                sale_price=sale, discount_pct=round(disc, 1),
+                category=category_name, store="Decathlon", image_url=image_url,
+            ))
         except Exception:
             continue
     return results
 
 
 def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
-                    max_pages: int = 3, debug: bool = False) -> list[Product]:
+                    max_pages: int = 5, debug: bool = False) -> list[Product]:
     all_products: list[Product] = []
     seen: set = set()
-    api_responses: list = []
-
-    def handle_response(resp):
-        try:
-            if (resp.status == 200 and "json" in resp.headers.get("content-type", "")
-                    and "decathlon.cl" in resp.url
-                    and any(k in resp.url for k in ["intelligent-search", "product_search", "catalog_system", "graphql"])):
-                body = resp.json()
-                if isinstance(body, (dict, list)) and body:
-                    api_responses.append(body)
-        except Exception:
-            pass
+    page_path = url.replace(BASE_URL, "")
 
     try:
         with sync_playwright() as pw:
@@ -120,64 +106,46 @@ def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
             page = context.new_page()
             if _HAS_STEALTH:
                 stealth_sync(page)
-            page.on("response", handle_response)
 
             try:
-                # Navegar con domcontentloaded (networkidle siempre timeout en Decathlon)
                 page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                page.wait_for_timeout(4000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
-                page.wait_for_timeout(2000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(3000)
 
                 title = page.title()
                 if debug:
-                    print(f"  [decathlon] p1: {title[:60]} | interceptadas: {len(api_responses)}")
+                    print(f"  [decathlon] p1: {title[:60]}")
 
-                # In-browser fetch a VTEX API para obtener productos con descuento
-                endpoints = [
-                    '/api/intelligent-search/product_search?sort=discount%3Adesc&count=50&page=1&locale=es-CL',
-                    '/api/intelligent-search/product_search?sort=discount%3Adesc&count=50&page=1',
-                ]
-                for ep in endpoints:
+                # Parse page 1
+                html1 = page.content()
+                found = _parse_html(html1, category_name, min_discount, seen)
+                all_products.extend(found)
+                if debug:
+                    print(f"  [decathlon] p1: {len(found)} productos con descuento")
+
+                # Pages 2+ via in-browser fetch (no navigation needed)
+                for pg in range(2, max_pages + 1):
+                    ep = f"{page_path}?page={pg}"
                     try:
-                        api_json = page.evaluate(f"""async () => {{
+                        html_pg = page.evaluate(f"""async () => {{
                             const r = await fetch('{ep}', {{credentials:'include'}});
-                            if (!r.ok) return JSON.stringify({{error: r.status}});
+                            if (!r.ok) return '';
                             return r.text();
                         }}""")
-                        if debug:
-                            print(f"  [decathlon] fetch {ep[:60]}: {str(api_json)[:80]}")
-                        if api_json and '"error"' not in api_json[:20]:
-                            data = json.loads(api_json)
-                            api_responses.append(data)
+                        if not html_pg:
                             break
+                        found_pg = _parse_html(html_pg, category_name, min_discount, seen)
+                        if not found_pg and pg > 2:
+                            break
+                        all_products.extend(found_pg)
+                        if debug:
+                            print(f"  [decathlon] p{pg}: {len(found_pg)} productos con descuento")
                     except Exception as e:
                         if debug:
-                            print(f"  [decathlon] fetch error: {e}")
-
-                # Página 2+ via in-browser fetch
-                for pg in range(2, max_pages + 1):
-                    try:
-                        ep2 = f'/api/intelligent-search/product_search?sort=discount%3Adesc&count=50&page={pg}&locale=es-CL'
-                        api_json2 = page.evaluate(f"""async () => {{
-                            const r = await fetch('{ep2}', {{credentials:'include'}});
-                            if (!r.ok) return JSON.stringify({{error: r.status}});
-                            return r.text();
-                        }}""")
-                        if not api_json2 or '"error"' in api_json2[:20]:
-                            break
-                        data2 = json.loads(api_json2)
-                        products_in_page = data2.get("products", []) if isinstance(data2, dict) else (data2 if isinstance(data2, list) else [])
-                        if not products_in_page:
-                            break
-                        api_responses.append(data2)
-                    except Exception:
+                            print(f"  [decathlon] p{pg} error: {e}")
                         break
 
             except PlaywrightTimeout:
-                logging.warning("[decathlon] Timeout — usando respuestas interceptadas")
+                logging.warning("[decathlon] Timeout en %s — usando lo capturado", category_name)
             except Exception as e:
                 logging.error("[decathlon] Error: %s", e)
 
@@ -186,10 +154,7 @@ def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
     except Exception as e:
         logging.error("[decathlon] Error general: %s", e)
 
-    for data in api_responses:
-        found = _parse_vtex(data, category_name, min_discount, seen)
-        all_products.extend(found)
-
+    logging.info("[decathlon] %s: %d productos >= %.0f%%", category_name, len(all_products), min_discount)
     if debug:
         print(f"  [decathlon] Total: {len(all_products)} productos >= {min_discount:.0f}%")
     return all_products

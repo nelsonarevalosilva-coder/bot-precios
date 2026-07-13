@@ -23,6 +23,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Sodimac"
+    image_url: str = ""
 
 
 def _clean_price(text: str) -> int | None:
@@ -88,6 +89,19 @@ def _extract_products(next_data_json: str, category_name: str, min_discount: flo
             if is_price_error and normal_price:
                 discount = (normal_price - sale_price) / normal_price * 100
 
+            # Imagen: mediaUrls[] es un array de strings directos
+            media_urls = item.get("mediaUrls") or []
+            image_url = media_urls[0] if media_urls else ""
+            if not image_url:
+                img_data = item.get("primaryImage") or {}
+                image_url = img_data.get("url") or img_data.get("sourceUrl") or ""
+            if not image_url:
+                img_list = item.get("imageList") or item.get("images") or []
+                if img_list and isinstance(img_list[0], dict):
+                    image_url = img_list[0].get("url") or img_list[0].get("sourceUrl") or ""
+            if not image_url:
+                image_url = item.get("imageUrl") or item.get("image") or ""
+
             products.append(Product(
                 name=name[:120],
                 url=url,
@@ -96,6 +110,7 @@ def _extract_products(next_data_json: str, category_name: str, min_discount: flo
                 discount_pct=round(discount, 1),
                 category=category_name,
                 store="Sodimac",
+                image_url=image_url,
             ))
         except Exception:
             continue

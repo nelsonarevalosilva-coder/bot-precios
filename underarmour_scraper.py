@@ -122,8 +122,12 @@ def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
 
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                page.wait_for_timeout(4000)
-                # Scroll para cargar lazy-load de productos
+                # Esperar a que carguen los product tiles (SPA con Constructor.io)
+                try:
+                    page.wait_for_selector("[data-pid]", timeout=25000)
+                except PlaywrightTimeout:
+                    pass  # Si no aparecen, se intentará parsear lo que haya
+                # Scroll para cargar lazy-load
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.3)")
                 page.wait_for_timeout(1500)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.6)")

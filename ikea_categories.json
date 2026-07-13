@@ -1,3 +1,23 @@
 [
-  {"name": "Ofertas", "url": "https://www.ikea.com/cl/es/offers/"}
+  {"name": "Ofertas",                    "url": "https://www.ikea.com/cl/es/offers/"},
+  {"name": "Sofás y Sillones",           "url": "https://www.ikea.com/cl/es/cat/sofas-sillones-700640/"},
+  {"name": "Escritorios y Sillas",       "url": "https://www.ikea.com/cl/es/cat/escritorios-sillas-escritorio-fu004/"},
+  {"name": "Almacenamiento",             "url": "https://www.ikea.com/cl/es/cat/almacenamiento-organizacion-st001/"},
+  {"name": "Bebés y Niños",              "url": "https://www.ikea.com/cl/es/cat/bebes-ninas-ninos-bc001/"},
+  {"name": "Mesas y Sillas",             "url": "https://www.ikea.com/cl/es/cat/mesas-sillas-fu002/"},
+  {"name": "Camas y Colchones",          "url": "https://www.ikea.com/cl/es/cat/camas-colchones-bm001/"},
+  {"name": "Iluminación",               "url": "https://www.ikea.com/cl/es/cat/iluminacion-li001/"},
+  {"name": "Textiles",                   "url": "https://www.ikea.com/cl/es/cat/textiles-tl001/"},
+  {"name": "Decoración",                "url": "https://www.ikea.com/cl/es/cat/decoracion-de001/"},
+  {"name": "Jardinería y Plantas",       "url": "https://www.ikea.com/cl/es/cat/jardineria-plantas-pp001/"},
+  {"name": "Organizadores Pequeños",     "url": "https://www.ikea.com/cl/es/cat/almacenajes-organizadores-pequenos-st007/"},
+  {"name": "Vajilla y Cocina",           "url": "https://www.ikea.com/cl/es/cat/vajilla-utensilios-cocina-kt001/"},
+  {"name": "Cocina y Electrodomésticos", "url": "https://www.ikea.com/cl/es/cat/cocina-ka001/"},
+  {"name": "Cortinas",                   "url": "https://www.ikea.com/cl/es/cat/cortinas-tl002/"},
+  {"name": "Baño",                       "url": "https://www.ikea.com/cl/es/cat/bano-ba001/"},
+  {"name": "Jardín y Terraza",           "url": "https://www.ikea.com/cl/es/cat/jardin-terraza-y-balcon-od001/"},
+  {"name": "Lavandería y Limpieza",      "url": "https://www.ikea.com/cl/es/cat/lavanderia-limpieza-lc001/"},
+  {"name": "Electrónica",               "url": "https://www.ikea.com/cl/es/cat/aparatos-electronicos-he001/"},
+  {"name": "Home Smart",                 "url": "https://www.ikea.com/cl/es/cat/smart-home-hs001/"},
+  {"name": "Mascotas",                   "url": "https://www.ikea.com/cl/es/cat/mascotas-pt001/"}
 ]

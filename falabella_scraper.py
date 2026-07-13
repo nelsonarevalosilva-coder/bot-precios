@@ -21,6 +21,8 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Falabella"
+    image_url: str = ""
+    seller: str = ""
 
 
 def _clean_price(text: str) -> int | None:
@@ -90,6 +92,19 @@ def _extract_products(next_data_json: str, category_name: str, min_discount: flo
             if is_price_error and normal_price:
                 discount = (normal_price - sale_price) / normal_price * 100
 
+            media = item.get("mediaUrls") or item.get("images") or item.get("media") or []
+            image_url = media[0] if media and isinstance(media[0], str) else (media[0].get("url", "") if media and isinstance(media[0], dict) else "")
+
+            seller = item.get("sellerName") or item.get("seller") or ""
+            if not seller:
+                sellers_list = item.get("sellers") or []
+                if sellers_list:
+                    first = sellers_list[0]
+                    seller = first.get("name") or first.get("sellerName") or "" if isinstance(first, dict) else str(first)
+            if not seller:
+                is_mp = item.get("isMarketplace") or item.get("marketplace") or False
+                seller = "Marketplace" if is_mp else "Falabella"
+
             products.append(Product(
                 name=name[:120],
                 url=url,
@@ -98,6 +113,8 @@ def _extract_products(next_data_json: str, category_name: str, min_discount: flo
                 discount_pct=round(discount, 1),
                 category=category_name,
                 store="Falabella",
+                image_url=image_url,
+                seller=seller,
             ))
         except Exception:
             continue

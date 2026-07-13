@@ -25,6 +25,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Amoble"
+    image_url: str = ""
 
 
 def _parse_price(amount_str: str) -> int:
@@ -65,6 +66,11 @@ def _extract_products(soup: BeautifulSoup, category_name: str, min_discount: flo
         if not url:
             continue
 
+        img_tag = item.find("img", class_="product-image-photo") or item.find("img")
+        image_url = ""
+        if img_tag:
+            image_url = img_tag.get("data-src") or img_tag.get("src") or ""
+
         results.append(Product(
             name=name,
             url=url,
@@ -73,6 +79,7 @@ def _extract_products(soup: BeautifulSoup, category_name: str, min_discount: flo
             discount_pct=discount_pct,
             category=category_name,
             store="Amoble",
+            image_url=image_url,
         ))
 
     seen = set()

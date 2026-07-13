@@ -24,6 +24,9 @@ class Product:
     sale_price: int
     discount_pct: float
     category: str
+    store: str = "Ripley"
+    image_url: str = ""
+    seller: str = ""
 
 
 def _clean_price(text: str) -> int | None:
@@ -92,6 +95,19 @@ def _extract_products(next_data_json: str, category_name: str, min_discount: flo
             description = item.get("description", name)
             url = _product_url(parent_id, description)
 
+            images = item.get("images") or item.get("media") or []
+            image_url = images[0].get("url", "") if images and isinstance(images[0], dict) else (images[0] if images and isinstance(images[0], str) else "")
+
+            seller = (
+                item.get("sellerName")
+                or item.get("seller")
+                or item.get("marketplaceSellerName")
+                or ""
+            )
+            if not seller:
+                is_mp = item.get("isMarketplace") or item.get("marketplace") or False
+                seller = "Marketplace" if is_mp else "Ripley"
+
             products.append(Product(
                 name=name[:120],
                 url=url,
@@ -99,6 +115,9 @@ def _extract_products(next_data_json: str, category_name: str, min_discount: flo
                 sale_price=sale_price,
                 discount_pct=round(real_discount, 1),
                 category=category_name,
+                store="Ripley",
+                image_url=image_url,
+                seller=seller,
             ))
         except Exception:
             continue

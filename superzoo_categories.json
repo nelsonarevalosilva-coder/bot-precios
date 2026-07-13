@@ -1,0 +1,11 @@
+[
+  {"name": "Perros - Alimentos",          "url": "https://www.superzoo.cl/perro/alimentos"},
+  {"name": "Perros - Farmacia e Higiene", "url": "https://www.superzoo.cl/perro/farmacia-e-higiene"},
+  {"name": "Perros - Accesorios",         "url": "https://www.superzoo.cl/perro/accesorios"},
+  {"name": "Perros - Juguetes",           "url": "https://www.superzoo.cl/perro/juguetes"},
+  {"name": "Gatos - Alimentos",           "url": "https://www.superzoo.cl/gato/alimentos"},
+  {"name": "Gatos - Arena y Accesorios",  "url": "https://www.superzoo.cl/gato/arena-y-accesorios"},
+  {"name": "Gatos - Farmacia e Higiene",  "url": "https://www.superzoo.cl/gato/farmacia-e-higiene"},
+  {"name": "Gatos - Accesorios",          "url": "https://www.superzoo.cl/gato/accesorios"},
+  {"name": "Precios Bomba",               "url": "https://www.superzoo.cl/promociones/precios-bomba"}
+]

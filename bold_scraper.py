@@ -27,6 +27,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Bold"
+    image_url: str = ""
 
 
 def scrape_category(

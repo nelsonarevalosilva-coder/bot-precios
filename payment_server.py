@@ -141,6 +141,8 @@ def mp_webhook():
         )
         return jsonify({"ok": True})
 
+    SEARCH_BOT = "https://t.me/Ofertas_search_bot"
+
     # Enviar mensaje de bienvenida con los links
     if channel_key == "all":
         msg = (
@@ -150,7 +152,11 @@ def mp_webhook():
         )
         for name, link in invite_links:
             msg += f"• {name}: {link}\n"
-        msg += "\n⏰ Los links expiran en 24 horas si no los usas."
+        msg += (
+            f"\n⏰ Los links expiran en 24 horas si no los usas.\n\n"
+            f"🔍 <b>Buscador exclusivo:</b> {SEARCH_BOT}\n"
+            f"Escribe cualquier producto y te mostramos las mejores ofertas."
+        )
     else:
         ch_name, link = invite_links[0]
         msg = (
@@ -158,7 +164,9 @@ def mp_webhook():
             f"Canal: <b>{ch_name}</b>\n"
             f"Plan: <b>{plan['label']}</b>\n\n"
             f"👇 Link de acceso (uso único):\n{link}\n\n"
-            f"⏰ El link expira en 24 horas si no lo usas."
+            f"⏰ El link expira en 24 horas si no lo usas.\n\n"
+            f"🔍 <b>Buscador exclusivo:</b> {SEARCH_BOT}\n"
+            f"Escribe cualquier producto y te mostramos las mejores ofertas."
         )
 
     send_telegram(telegram_id, msg)

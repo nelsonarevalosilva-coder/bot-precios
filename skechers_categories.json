@@ -1,4 +1,4 @@
 [
-  {"name": "Sale", "url": "https://www.skechers.cl/catalogo/?sf=3"},
-  {"name": "Outlet", "url": "https://www.skechers.cl/catalogo/?n=OUTLET"}
+  {"name": "Sale Hombre", "url": "https://www.skechers.cl/sale?categoria=hombre"},
+  {"name": "Sale Mujer",  "url": "https://www.skechers.cl/sale?categoria=mujer"}
 ]

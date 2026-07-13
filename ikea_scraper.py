@@ -25,6 +25,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "IKEA"
+    image_url: str = ""
 
 
 def _parse_formatted_price(whole_number: str) -> int:

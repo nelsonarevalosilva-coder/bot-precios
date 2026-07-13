@@ -3,6 +3,7 @@ Scraper para Cruz Verde — Salesforce Commerce Cloud (SFCC) API pública.
 Usa la API beta.cruzverde.cl con client_id público para buscar productos con descuento.
 El precio club (price-sale-cl) vs precio lista (price-list-cl) = descuento real.
 """
+import re
 import time
 from dataclasses import dataclass
 
@@ -14,7 +15,16 @@ HEADERS = {
 }
 API_BASE = "https://beta.cruzverde.cl/s/Chile/dw/shop/v19_1/product_search"
 CLIENT_ID = "c19ce24d-1677-4754-b9f7-c193997c5a92"
-PRODUCT_URL = "https://www.cruzverde.cl/p/{product_id}"
+BASE_URL = "https://www.cruzverde.cl"
+
+
+def _make_slug(name: str) -> str:
+    name = name.lower()
+    for a, b in [("á","a"),("é","e"),("í","i"),("ó","o"),("ú","u"),("ñ","n"),("ü","u")]:
+        name = name.replace(a, b)
+    name = name.replace(".", "")  # "0.5 mg" → "05-mg" como hace el sitio
+    return re.sub(r"[^a-z0-9]+", "-", name).strip("-")
+
 PAGE_SIZE = 50
 
 # Términos de búsqueda para cubrir el catálogo
@@ -34,6 +44,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Cruz Verde"
+    image_url: str = ""
 
 
 def scrape_category(
@@ -54,7 +65,7 @@ def scrape_category(
                     API_BASE,
                     params={
                         "q": term,
-                        "expand": "prices",
+                        "expand": "prices,images",
                         "client_id": CLIENT_ID,
                         "count": PAGE_SIZE,
                         "start": start,
@@ -93,7 +104,11 @@ def scrape_category(
                 if not name:
                     continue
 
-                product_url = PRODUCT_URL.format(product_id=pid)
+                image_data = hit.get("image", {}) or {}
+                image_url = image_data.get("dis_base_link") or image_data.get("link") or ""
+
+                slug = _make_slug(name[:80])
+                product_url = f"{BASE_URL}/{slug}/{pid}.html"
                 results.append(Product(
                     name=name[:120],
                     url=product_url,
@@ -102,6 +117,7 @@ def scrape_category(
                     discount_pct=round(discount_pct, 1),
                     category=category_name,
                     store="Cruz Verde",
+                    image_url=image_url,
                 ))
 
             if debug:

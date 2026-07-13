@@ -29,6 +29,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Xiaomi"
+    image_url: str = ""
 
 
 def _clean_price(val) -> int | None:

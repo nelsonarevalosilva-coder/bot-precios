@@ -32,6 +32,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "abc"
+    image_url: str = ""
 
 
 def _parse_price(val: str) -> int:

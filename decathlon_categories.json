@@ -1,3 +1,5 @@
 [
-  {"name": "Ofertas Deporte", "url": "https://www.decathlon.cl/search?q=oferta&sort=discount-desc"}
+  {"name": "Ofertas General",  "url": "https://www.decathlon.cl/5968-ofertas"},
+  {"name": "Ofertas Hombre",   "url": "https://www.decathlon.cl/5966-ofertas-hombre"},
+  {"name": "Ofertas Mujer",    "url": "https://www.decathlon.cl/5967-ofertas-mujer"}
 ]

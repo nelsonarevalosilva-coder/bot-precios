@@ -13,6 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import adidas_scraper
+import nike_scraper
 import bata_scraper
 import newbalance_scraper
 import converse_scraper
@@ -40,7 +41,9 @@ def load_json(path):
 
 
 STORES = [
-    (load_json(BASE_DIR / "adidas_categories.json"),       adidas_scraper,       "Adidas",        25.0),
+    # Adidas.cl bloqueado por Akamai a nivel de IP del servidor — deshabilitado
+    # (load_json(BASE_DIR / "adidas_categories.json"),     adidas_scraper,       "Adidas",        25.0),
+    (load_json(BASE_DIR / "nike_categories.json"),         nike_scraper,         "Nike",          25.0),
     (load_json(BASE_DIR / "bata_categories.json"),         bata_scraper,         "Bata",          40.0),
     (load_json(BASE_DIR / "newbalance_categories.json"),   newbalance_scraper,   "New Balance",   40.0),
     (load_json(BASE_DIR / "converse_categories.json"),     converse_scraper,     "Converse",      40.0),

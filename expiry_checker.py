@@ -19,6 +19,7 @@ from sub_db import get_expired_subscriptions, init_sub_db, mark_expired
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+OWNER_TELEGRAM_ID = int(os.getenv("OWNER_TELEGRAM_ID", "0"))
 API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -61,6 +62,11 @@ def check_expiries():
     log.info(f"{len(expired)} suscripcion(es) vencida(s)")
     for sub in expired:
         try:
+            if sub["telegram_id"] == OWNER_TELEGRAM_ID:
+                mark_expired(sub["id"])
+                log.info(f"Owner ({OWNER_TELEGRAM_ID}) — suscripción expirada ignorada, no se expulsa")
+                continue
+
             removed = remove_from_channel(sub["channel_id"], sub["telegram_id"])
             mark_expired(sub["id"])
 

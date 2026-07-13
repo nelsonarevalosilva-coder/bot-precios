@@ -54,6 +54,19 @@ import kippichile_scraper
 import rosen_scraper
 import ahumada_scraper
 import cruzverde_scraper
+import pethome_scraper
+import merrell_scraper
+import lippi_scraper
+import fila_scraper
+import puma_scraper
+import crocs_scraper
+import vans_scraper
+import asics_scraper
+import hoka_scraper
+import reebok_scraper
+import pcfactory_scraper
+import superzoo_scraper
+import laika_scraper
 import thebodyshop_scraper
 import mundoaromas_scraper
 import cosmetic_scraper
@@ -74,10 +87,23 @@ import skechers_scraper
 import decathlon_scraper
 import underarmour_scraper
 import zara_scraper
+import bershka_scraper
+import pullandbear_scraper
+import stradivarius_scraper
+import hm_scraper
+import levis_scraper
+import tommy_scraper
+import calvinklein_scraper
+import tricot_scraper
 import xiaomi_scraper
 import corona_scraper
-from notifier import notify_big_discount, notify_catalog_summary, notify_price_error
-from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, init_db, mark_notified, save_price
+import buscalibre_scraper
+import santa_isabel_scraper
+import unimarc_scraper
+import rappi_monitor
+import ubereats_monitor
+from notifier import notify_big_discount, notify_catalog_summary, notify_price_error, get_channel_key_for_product
+from storage import clear_old_notifications, get_min_price_with_date, get_last_prices, has_been_notified, get_last_notified_price, init_db, mark_notified, save_price
 
 load_dotenv()
 
@@ -111,7 +137,20 @@ SAXOLINE_CATEGORIES_FILE = BASE_DIR / "saxoline_categories.json"
 KIPPICHILE_CATEGORIES_FILE = BASE_DIR / "kippichile_categories.json"
 ROSEN_CATEGORIES_FILE = BASE_DIR / "rosen_categories.json"
 AHUMADA_CATEGORIES_FILE = BASE_DIR / "ahumada_categories.json"
-CRUZVERDE_CATEGORIES_FILE = BASE_DIR / "cruzverde_categories.json"
+CRUZVERDE_CATEGORIES_FILE  = BASE_DIR / "cruzverde_categories.json"
+PETHOME_CATEGORIES_FILE    = BASE_DIR / "pethome_categories.json"
+MERRELL_CATEGORIES_FILE    = BASE_DIR / "merrell_categories.json"
+LIPPI_CATEGORIES_FILE      = BASE_DIR / "lippi_categories.json"
+FILA_CATEGORIES_FILE       = BASE_DIR / "fila_categories.json"
+PUMA_CATEGORIES_FILE       = BASE_DIR / "puma_categories.json"
+CROCS_CATEGORIES_FILE      = BASE_DIR / "crocs_categories.json"
+VANS_CATEGORIES_FILE       = BASE_DIR / "vans_categories.json"
+ASICS_CATEGORIES_FILE      = BASE_DIR / "asics_categories.json"
+HOKA_CATEGORIES_FILE       = BASE_DIR / "hoka_categories.json"
+REEBOK_CATEGORIES_FILE     = BASE_DIR / "reebok_categories.json"
+PCFACTORY_CATEGORIES_FILE  = BASE_DIR / "pcfactory_categories.json"
+SUPERZOO_CATEGORIES_FILE   = BASE_DIR / "superzoo_categories.json"
+LAIKA_CATEGORIES_FILE      = BASE_DIR / "laika_categories.json"
 THEBODYSHOP_CATEGORIES_FILE = BASE_DIR / "thebodyshop_categories.json"
 MUNDOAROMAS_CATEGORIES_FILE = BASE_DIR / "mundoaromas_categories.json"
 COSMETIC_CATEGORIES_FILE = BASE_DIR / "cosmetic_categories.json"
@@ -132,10 +171,23 @@ SKECHERS_CATEGORIES_FILE = BASE_DIR / "skechers_categories.json"
 DECATHLON_CATEGORIES_FILE = BASE_DIR / "decathlon_categories.json"
 UNDERARMOUR_CATEGORIES_FILE = BASE_DIR / "underarmour_categories.json"
 ZARA_CATEGORIES_FILE = BASE_DIR / "zara_categories.json"
+BERSHKA_CATEGORIES_FILE = BASE_DIR / "bershka_categories.json"
+PULLANDBEAR_CATEGORIES_FILE = BASE_DIR / "pullandbear_categories.json"
+STRADIVARIUS_CATEGORIES_FILE = BASE_DIR / "stradivarius_categories.json"
+HM_CATEGORIES_FILE = BASE_DIR / "hm_categories.json"
+LEVIS_CATEGORIES_FILE = BASE_DIR / "levis_categories.json"
+TOMMY_CATEGORIES_FILE = BASE_DIR / "tommy_categories.json"
+CALVINKLEIN_CATEGORIES_FILE = BASE_DIR / "calvinklein_categories.json"
+TRICOT_CATEGORIES_FILE = BASE_DIR / "tricot_categories.json"
 XIAOMI_CATEGORIES_FILE = BASE_DIR / "xiaomi_categories.json"
 CORONA_CATEGORIES_FILE = BASE_DIR / "corona_categories.json"
+BUSCALIBRE_CATEGORIES_FILE = BASE_DIR / "buscalibre_categories.json"
+SANTA_ISABEL_CATEGORIES_FILE = BASE_DIR / "santa_isabel_categories.json"
+UNIMARC_CATEGORIES_FILE = BASE_DIR / "unimarc_categories.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 CATALOG_INTERVAL_HOURS = float(os.getenv("CATALOG_INTERVAL_HOURS", "0.5"))
+RAPPI_INTERVAL_HOURS = float(os.getenv("RAPPI_INTERVAL_HOURS", "2"))
+UBEREATS_INTERVAL_HOURS = float(os.getenv("UBEREATS_INTERVAL_HOURS", "2"))
 MIN_DISCOUNT = float(os.getenv("MIN_DISCOUNT_PCT", "70"))
 PRICE_ERROR_THRESHOLD = float(os.getenv("PRICE_ERROR_THRESHOLD_PCT", "80"))
 LICORES_MIN_DISCOUNT = 30.0  # umbral para licores y tiendas con descuentos bajos
@@ -177,7 +229,7 @@ def scan_store(categories: list[dict], scraper_module, store_name: str, min_disc
                 url=cat["url"],
                 category_name=cat["name"],
                 min_discount=min_discount,
-                max_pages=3,
+                max_pages=cat.get("max_pages", 3),
                 debug=debug,
             )
 
@@ -192,11 +244,13 @@ def scan_store(categories: list[dict], scraper_module, store_name: str, min_disc
 
                 # Registrar precio en historial ANTES de notificar
                 min_data = get_min_price_with_date(p.url)
-                last_prices = get_last_prices(p.url, limit=2)
+                last_prices = get_last_prices(p.url, limit=5)
+                prev_notified_price = get_last_notified_price(p.url)
                 save_price(p.name, p.url, p.sale_price)
 
                 if has_been_notified(p.url, p.sale_price):
-                    logging.info(f"      (ya notificado)")
+                    prev_str = f"${prev_notified_price:,}" if prev_notified_price else "precio anterior"
+                    logging.info(f"      (ya notificado a {prev_str} — sin mejora)")
                     continue
 
                 if p.discount_pct >= PRICE_ERROR_THRESHOLD:
@@ -204,12 +258,13 @@ def scan_store(categories: list[dict], scraper_module, store_name: str, min_disc
                     if ok:
                         total_errors += 1
                 else:
-                    ok = notify_big_discount(p, min_data, last_prices)
+                    ok = notify_big_discount(p, min_data, last_prices, prev_notified_price=prev_notified_price)
                     if ok:
                         total_alerts += 1
 
                 if ok:
-                    mark_notified(p.url, p.name, p.discount_pct, p.sale_price)
+                    ch_key = get_channel_key_for_product(p)
+                    mark_notified(p.url, p.name, p.discount_pct, p.sale_price, ch_key)
 
             time.sleep(3)
 
@@ -239,6 +294,16 @@ def run_catalog_scan(
             return 20.0
         if store_name in {"Nike", "Adidas"}:
             return 25.0
+        if store_name in {"SuperZoo", "PetHome", "Laika"}:
+            return 25.0
+        if store_name in {"IKEA", "Merrell", "Lippi", "Fila", "Puma", "Crocs", "Vans", "Asics", "HOKA", "Reebok"}:
+            return 30.0
+        if store_name in {"Bershka", "Pull&Bear", "Stradivarius", "H&M", "Levi's", "Tommy Hilfiger", "Calvin Klein", "Tricot", "Zara"}:
+            return 25.0
+        if store_name == "Buscalibre":
+            return 70.0
+        if store_name in {"Jumbo", "Santa Isabel", "Unimarc"}:
+            return 20.0
         return min_discount
 
     stores_to_run: list[tuple] = []
@@ -302,6 +367,28 @@ def run_catalog_scan(
         stores_to_run.append((load_json(AHUMADA_CATEGORIES_FILE), ahumada_scraper, "Farmacia Ahumada", _store_discount("Farmacia Ahumada")))
     if only_store is None or only_store.lower() == "cruzverde":
         stores_to_run.append((load_json(CRUZVERDE_CATEGORIES_FILE), cruzverde_scraper, "Cruz Verde", _store_discount("Cruz Verde")))
+    if only_store is None or only_store.lower() == "pethome":
+        stores_to_run.append((load_json(PETHOME_CATEGORIES_FILE), pethome_scraper, "PetHome", _store_discount("PetHome")))
+    if only_store is None or only_store.lower() == "merrell":
+        stores_to_run.append((load_json(MERRELL_CATEGORIES_FILE), merrell_scraper, "Merrell", _store_discount("Merrell")))
+    if only_store is None or only_store.lower() == "lippi":
+        stores_to_run.append((load_json(LIPPI_CATEGORIES_FILE), lippi_scraper, "Lippi", _store_discount("Lippi")))
+    if only_store is None or only_store.lower() == "fila":
+        stores_to_run.append((load_json(FILA_CATEGORIES_FILE), fila_scraper, "Fila", _store_discount("Fila")))
+    if only_store is None or only_store.lower() == "puma":
+        stores_to_run.append((load_json(PUMA_CATEGORIES_FILE), puma_scraper, "Puma", _store_discount("Puma")))
+    if only_store is None or only_store.lower() == "crocs":
+        stores_to_run.append((load_json(CROCS_CATEGORIES_FILE), crocs_scraper, "Crocs", _store_discount("Crocs")))
+    if only_store is None or only_store.lower() == "vans":
+        stores_to_run.append((load_json(VANS_CATEGORIES_FILE), vans_scraper, "Vans", _store_discount("Vans")))
+    if only_store is None or only_store.lower() == "asics":
+        stores_to_run.append((load_json(ASICS_CATEGORIES_FILE), asics_scraper, "Asics", _store_discount("Asics")))
+    if only_store is None or only_store.lower() == "hoka":
+        stores_to_run.append((load_json(HOKA_CATEGORIES_FILE), hoka_scraper, "HOKA", _store_discount("HOKA")))
+    if only_store is None or only_store.lower() == "superzoo":
+        stores_to_run.append((load_json(SUPERZOO_CATEGORIES_FILE), superzoo_scraper, "SuperZoo", _store_discount("SuperZoo")))
+    if only_store is None or only_store.lower() == "laika":
+        stores_to_run.append((load_json(LAIKA_CATEGORIES_FILE), laika_scraper, "Laika", _store_discount("Laika")))
     if only_store is None or only_store.lower() == "thebodyshop":
         stores_to_run.append((load_json(THEBODYSHOP_CATEGORIES_FILE), thebodyshop_scraper, "The Body Shop", _store_discount("The Body Shop")))
     if only_store is None or only_store.lower() == "mundoaromas":
@@ -342,10 +429,32 @@ def run_catalog_scan(
         stores_to_run.append((load_json(UNDERARMOUR_CATEGORIES_FILE), underarmour_scraper, "Under Armour", _store_discount("Under Armour")))
     if only_store is None or only_store.lower() == "zara":
         stores_to_run.append((load_json(ZARA_CATEGORIES_FILE), zara_scraper, "Zara", _store_discount("Zara")))
+    if only_store is None or only_store.lower() == "bershka":
+        stores_to_run.append((load_json(BERSHKA_CATEGORIES_FILE), bershka_scraper, "Bershka", _store_discount("Bershka")))
+    if only_store is None or only_store.lower() == "pullandbear":
+        stores_to_run.append((load_json(PULLANDBEAR_CATEGORIES_FILE), pullandbear_scraper, "Pull&Bear", _store_discount("Pull&Bear")))
+    if only_store is None or only_store.lower() == "stradivarius":
+        stores_to_run.append((load_json(STRADIVARIUS_CATEGORIES_FILE), stradivarius_scraper, "Stradivarius", _store_discount("Stradivarius")))
+    if only_store is None or only_store.lower() == "hm":
+        stores_to_run.append((load_json(HM_CATEGORIES_FILE), hm_scraper, "H&M", _store_discount("H&M")))
+    if only_store is None or only_store.lower() == "levis":
+        stores_to_run.append((load_json(LEVIS_CATEGORIES_FILE), levis_scraper, "Levi's", _store_discount("Levi's")))
+    if only_store is None or only_store.lower() == "tommy":
+        stores_to_run.append((load_json(TOMMY_CATEGORIES_FILE), tommy_scraper, "Tommy Hilfiger", _store_discount("Tommy Hilfiger")))
+    if only_store is None or only_store.lower() == "calvinklein":
+        stores_to_run.append((load_json(CALVINKLEIN_CATEGORIES_FILE), calvinklein_scraper, "Calvin Klein", _store_discount("Calvin Klein")))
+    if only_store is None or only_store.lower() == "tricot":
+        stores_to_run.append((load_json(TRICOT_CATEGORIES_FILE), tricot_scraper, "Tricot", _store_discount("Tricot")))
     if only_store is None or only_store.lower() == "xiaomi":
         stores_to_run.append((load_json(XIAOMI_CATEGORIES_FILE), xiaomi_scraper, "Xiaomi", _store_discount("Xiaomi")))
     if only_store is None or only_store.lower() == "corona":
         stores_to_run.append((load_json(CORONA_CATEGORIES_FILE), corona_scraper, "Corona", _store_discount("Corona")))
+    if only_store is None or only_store.lower() == "buscalibre":
+        stores_to_run.append((load_json(BUSCALIBRE_CATEGORIES_FILE), buscalibre_scraper, "Buscalibre", _store_discount("Buscalibre")))
+    if only_store is None or only_store.lower() == "santaisabel":
+        stores_to_run.append((load_json(SANTA_ISABEL_CATEGORIES_FILE), santa_isabel_scraper, "Santa Isabel", _store_discount("Santa Isabel")))
+    if only_store is None or only_store.lower() == "unimarc":
+        stores_to_run.append((load_json(UNIMARC_CATEGORIES_FILE), unimarc_scraper, "Unimarc", _store_discount("Unimarc")))
 
     logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
 
@@ -373,6 +482,11 @@ def run_catalog_scan(
     logging.info(f"Escaneo completado — Ofertas: {total_alerts} | Errores precio: {total_errors}")
     logging.info(f"{'='*60}")
 
+    # Supermercados: re-notificar al día siguiente (precios cambian diario)
+    clear_old_notifications(days=1, url_pattern="%jumbo%")
+    clear_old_notifications(days=1, url_pattern="%santaisabel%")
+    clear_old_notifications(days=1, url_pattern="%unimarc%")
+    # Resto de tiendas: 7 días
     clear_old_notifications(days=7)
 
     notify_catalog_summary(total_alerts, total_cats, total_errors)
@@ -388,7 +502,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop", "mundoaromas", "cosmetic", "alishaperfumes", "lodoro", "santiagoperfumes", "adidas", "nike", "ofertaperfumes", "yauras", "eliteperfumes", "sairam", "mercadolibre", "bata", "newbalance", "converse", "skechers", "decathlon", "underarmour", "zara", "xiaomi", "corona"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop", "mundoaromas", "cosmetic", "alishaperfumes", "lodoro", "santiagoperfumes", "adidas", "nike", "ofertaperfumes", "yauras", "eliteperfumes", "sairam", "mercadolibre", "bata", "newbalance", "converse", "skechers", "decathlon", "underarmour", "zara", "bershka", "pullandbear", "stradivarius", "hm", "levis", "tommy", "calvinklein", "tricot", "xiaomi", "corona", "buscalibre", "santaisabel", "unimarc"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)
@@ -398,11 +512,20 @@ def main():
         run_catalog_scan(only_store=args.store, debug=args.debug)
         sys.exit(0)
 
-    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 52 tiendas")
+    logging.info(f"Monitor iniciado — intervalo: {CATALOG_INTERVAL_HOURS}h | descuento >= {MIN_DISCOUNT:.0f}% | 73 tiendas")
+    logging.info(f"Rappi delivery monitor — intervalo: {RAPPI_INTERVAL_HOURS}h")
+    logging.info(f"Uber Eats monitor — intervalo: {UBEREATS_INTERVAL_HOURS}h")
 
-    run_catalog_scan(debug=args.debug)  # escaneo inmediato al arrancar
+    run_catalog_scan(only_store=args.store, debug=args.debug)  # escaneo inmediato al arrancar
 
-    schedule.every(CATALOG_INTERVAL_HOURS).hours.do(run_catalog_scan, debug=args.debug)
+    # Delivery monitors: escaneo inicial diferido para no solapar con el catalog scan
+    schedule.every(RAPPI_INTERVAL_HOURS).hours.do(rappi_monitor.run_scan)
+    schedule.every(UBEREATS_INTERVAL_HOURS).hours.do(ubereats_monitor.run_scan)
+    time.sleep(30)
+    rappi_monitor.run_scan()
+    ubereats_monitor.run_scan()
+
+    schedule.every(CATALOG_INTERVAL_HOURS).hours.do(run_catalog_scan, only_store=args.store, debug=args.debug)
 
     while True:
         schedule.run_pending()

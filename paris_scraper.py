@@ -30,6 +30,8 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Paris"
+    image_url: str = ""
+    seller: str = ""
 
 
 def _calc_normal_price(sale_price: int, discount_pct: float) -> int:
@@ -72,14 +74,39 @@ def _extract_products(data: dict, category_name: str, min_discount: float) -> li
                 continue
             seen_ids.add(product_id)
 
+            image_url = d.get("image_url") or d.get("ImageUrl") or ""
+            if not image_url:
+                img_list = d.get("image_urls") or []
+                if img_list:
+                    first = img_list[0]
+                    image_url = first.get("url", "") if isinstance(first, dict) else str(first)
+
+            sellers_list = d.get("sellers") or []
+            seller = sellers_list[0] if sellers_list else "Paris"
+
+            # Intentar obtener categoría real del producto desde la API
+            # Constructor.io puede devolver: categories, group_names, department, group
+            real_cat = ""
+            for cat_field in ("categories", "group_names", "department", "group"):
+                val = d.get(cat_field)
+                if val:
+                    if isinstance(val, list) and val:
+                        real_cat = str(val[-1])  # la más específica (último elemento)
+                    elif isinstance(val, str):
+                        real_cat = val
+                    break
+            effective_category = real_cat if real_cat else category_name
+
             products.append(Product(
                 name=name[:120],
                 url=url,
                 normal_price=normal_price,
                 sale_price=sale_price,
                 discount_pct=round(discount_pct, 1),
-                category=category_name,
+                category=effective_category,
                 store="Paris",
+                image_url=image_url,
+                seller=seller,
             ))
         except Exception:
             continue

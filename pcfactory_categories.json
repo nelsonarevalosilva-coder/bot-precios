@@ -1,11 +1,4 @@
 [
-  { "name": "Notebooks",      "url": "https://www.pcfactory.cl/search?q=notebook" },
-  { "name": "Monitores",      "url": "https://www.pcfactory.cl/search?q=monitor" },
-  { "name": "Componentes",    "url": "https://www.pcfactory.cl/search?q=procesador" },
-  { "name": "Audio",          "url": "https://www.pcfactory.cl/search?q=audifonos" },
-  { "name": "Almacenamiento", "url": "https://www.pcfactory.cl/search?q=disco+ssd" },
-  { "name": "Memorias",       "url": "https://www.pcfactory.cl/search?q=memoria+ram" },
-  { "name": "Impresoras",     "url": "https://www.pcfactory.cl/search?q=impresora" },
-  { "name": "Smartphones",    "url": "https://www.pcfactory.cl/search?q=smartphone" },
-  { "name": "Tablets",        "url": "https://www.pcfactory.cl/search?q=tablet" }
+  {"name": "Ofertas",         "url": "https://www.pcfactory.cl/ofertas"},
+  {"name": "Outlet",          "url": "https://www.pcfactory.cl/outlet-tecnologico"}
 ]

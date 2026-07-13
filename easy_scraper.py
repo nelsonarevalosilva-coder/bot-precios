@@ -30,6 +30,8 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Easy"
+    image_url: str = ""
+    seller: str = ""
 
 
 def _calc_normal_price(sale_price: int, discount_pct: float) -> int:
@@ -72,6 +74,24 @@ def _extract_products(data: dict, category_name: str, min_discount: float) -> li
                 continue
             seen_ids.add(product_id)
 
+            image_url = d.get("image_url") or d.get("ImageUrl") or ""
+            if not image_url:
+                img_list = d.get("image_urls") or []
+                if img_list:
+                    first = img_list[0]
+                    image_url = first.get("url", "") if isinstance(first, dict) else str(first)
+
+            seller = "Easy"
+            sku_sellers = d.get("SkuSellers") or []
+            if sku_sellers:
+                try:
+                    import json as _json
+                    first_s = _json.loads(sku_sellers[0]) if isinstance(sku_sellers[0], str) else sku_sellers[0]
+                    if str(first_s.get("SellerId", "1")) != "1":
+                        seller = first_s.get("SellerName", "") or "Marketplace"
+                except Exception:
+                    pass
+
             products.append(Product(
                 name=name[:120],
                 url=url,
@@ -80,6 +100,8 @@ def _extract_products(data: dict, category_name: str, min_discount: float) -> li
                 discount_pct=round(discount_pct, 1),
                 category=category_name,
                 store="Easy",
+                image_url=image_url,
+                seller=seller,
             ))
         except Exception:
             continue

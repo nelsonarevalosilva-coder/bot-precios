@@ -27,6 +27,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Farmacia Ahumada"
+    image_url: str = ""
 
 
 def _parse_price(text: str) -> int:
@@ -37,28 +38,36 @@ def _parse_price(text: str) -> int:
 def _extract_products(soup: BeautifulSoup, category_name: str, min_discount: float) -> list[Product]:
     results = []
     for tile in soup.select(".product-tile"):
-        if "Antes" not in tile.get_text():
-            continue
+        normal_price = 0
+        sale_price = 0
 
-        orig_el = tile.select_one(".strike-through .value")
-        if not orig_el:
-            continue
-        orig_content = orig_el.get("content", "")
-        normal_price = int(orig_content) if orig_content.isdigit() else 0
+        # Formato nuevo: "Price reduced from$18.079" en .strike-through.list
+        strike_list = tile.select_one(".strike-through.list")
+        if strike_list:
+            matches = re.findall(r'\$([\d.]+)', strike_list.get_text())
+            if matches:
+                normal_price = int(matches[0].replace(".", ""))
+            sale_el = tile.select_one(".promotion-badge-container.flex-row")
+            if sale_el:
+                sale_matches = re.findall(r'\$([\d.]+)', sale_el.get_text())
+                if sale_matches:
+                    sale_price = int(sale_matches[0].replace(".", ""))
+
+        # Formato viejo: .strike-through .value con atributo content + "Antes"
         if not normal_price:
-            continue
+            orig_el = tile.select_one(".strike-through .value")
+            if orig_el:
+                orig_content = orig_el.get("content", "")
+                normal_price = int(orig_content) if orig_content.isdigit() else 0
+        if not sale_price and normal_price:
+            default_el = tile.select_one(".default-price")
+            if default_el:
+                nums = [int(x.replace(".", "")) for x in re.findall(r"[\d.]+", default_el.get_text())
+                        if x.replace(".", "").isdigit() and int(x.replace(".", "")) > 100]
+                if nums:
+                    sale_price = nums[0]
 
-        default_el = tile.select_one(".default-price")
-        if not default_el:
-            continue
-        default_text = default_el.get_text(strip=True)
-        nums = [int(x.replace(".", "")) for x in re.findall(r"[\d.]+", default_text)
-                if x.replace(".", "").isdigit() and int(x.replace(".", "")) > 100]
-        if not nums:
-            continue
-        sale_price = nums[0]
-
-        if sale_price >= normal_price:
+        if not normal_price or not sale_price or sale_price >= normal_price:
             continue
 
         discount_pct = (normal_price - sale_price) / normal_price * 100
@@ -71,18 +80,21 @@ def _extract_products(soup: BeautifulSoup, category_name: str, min_discount: flo
         name = name_el.get_text(strip=True)
         href = name_el.get("href", "")
         url = href if href.startswith("http") else f"{BASE_URL}{href}"
-
         if not name or not url:
             continue
+
+        img = tile.select_one("img.tile-image") or tile.select_one("img")
+        image_url = img.get("src", "") if img else ""
 
         results.append(Product(
             name=name[:120],
             url=url,
             normal_price=normal_price,
             sale_price=sale_price,
-            discount_pct=discount_pct,
+            discount_pct=round(discount_pct, 1),
             category=category_name,
             store="Farmacia Ahumada",
+            image_url=image_url,
         ))
 
     seen = set()
@@ -118,8 +130,8 @@ def scrape_category(
         page_results = _extract_products(soup, category_name, min_discount)
 
         if debug:
-            sale = len([t for t in tiles if "Antes" in t.get_text()])
-            print(f"  [ahumada] pág {page+1}: {len(tiles)} total, {sale} en oferta, {len(page_results)} >= {min_discount:.0f}%")
+            sale = len([t for t in tiles if "Antes" in t.get_text() or t.select_one(".strike-through.list")])
+            print(f"  [ahumada] pág {page+1}: {len(tiles)} total, {sale} con descuento, {len(page_results)} >= {min_discount:.0f}%")
 
         results.extend(page_results)
 

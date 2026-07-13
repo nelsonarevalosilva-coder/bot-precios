@@ -1,9 +1,11 @@
 """
-Scraper para Skechers Chile — Playwright con intercepción de red.
-Skechers usa plataforma propia; Playwright navega su catálogo de sale.
+Scraper para Skechers Chile — Playwright + parseo HTML plataforma Andain.
+Productos en div.item-producto; precios en <s> (normal) y texto restante <h3> (sale).
+URL correcta: /sale (no /catalogo/ que redirige al home)
 """
 import logging
 import re
+from copy import copy
 from dataclasses import dataclass
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
@@ -39,118 +41,114 @@ def _clean_price(val) -> int | None:
     return int(digits) if digits and 2 < len(digits) < 9 else None
 
 
-def _parse_api(data, category_name, min_discount, seen):
+def _parse_html(html: str, category_name: str, min_discount: float, seen: set) -> list[Product]:
+    soup = BeautifulSoup(html, "html.parser")
     results = []
-    products = []
-    if isinstance(data, dict):
-        products = (data.get("products") or data.get("items") or
-                    data.get("data", {}).get("products") or [])
-    elif isinstance(data, list):
-        products = data
-    for p in products:
+    for item in soup.find_all("div", class_="item-producto"):
         try:
-            pid = str(p.get("id") or p.get("productId") or "")
-            if not pid or pid in seen:
+            link = item.find("a", href=True)
+            if not link:
                 continue
-            seen.add(pid)
-            name = (p.get("name") or p.get("productName") or p.get("title") or "").strip()
+            href = link["href"]
+            product_url = href if href.startswith("http") else f"{BASE_URL}{href}"
+            if product_url in seen:
+                continue
+
+            name_tag = item.find("h2")
+            name = name_tag.get_text(strip=True) if name_tag else link.get_text(strip=True)
             if not name:
                 continue
-            link = p.get("url") or p.get("link") or p.get("href") or ""
-            url = link if link.startswith("http") else f"{BASE_URL}{link}"
-            pr = p.get("priceRange") or {}
-            normal = _clean_price((pr.get("listPrice") or {}).get("highPrice") or p.get("listPrice") or p.get("originalPrice"))
-            sale = _clean_price((pr.get("sellingPrice") or {}).get("lowPrice") or p.get("price") or p.get("salePrice"))
+
+            img_tag = item.find("img")
+            image_url = ""
+            if img_tag:
+                image_url = img_tag.get("data-src") or img_tag.get("src") or ""
+
+            # Price: <h3><s>$XX.XXX</s> $YY.YYY</h3>
+            h3 = item.find("h3")
+            if not h3:
+                continue
+            s_tag = h3.find("s")
+            if not s_tag:
+                continue
+            normal = _clean_price(s_tag.get_text())
+            # Sale price = h3 text minus the s tag content
+            h3_copy = BeautifulSoup(str(h3), "html.parser").find("h3")
+            if h3_copy:
+                for s in h3_copy.find_all("s"):
+                    s.decompose()
+                sale = _clean_price(h3_copy.get_text())
+            else:
+                sale = None
             if not normal or not sale or normal <= sale:
                 continue
             disc = (normal - sale) / normal * 100
             if disc < min_discount:
                 continue
-            results.append(Product(name=name[:120], url=url, normal_price=normal,
-                                   sale_price=sale, discount_pct=round(disc, 1),
-                                   category=category_name, store="Skechers"))
+
+            seen.add(product_url)
+            results.append(Product(
+                name=name[:120], url=product_url, normal_price=normal,
+                sale_price=sale, discount_pct=round(disc, 1),
+                category=category_name, store="Skechers", image_url=image_url,
+            ))
         except Exception:
             continue
     return results
 
 
-def _parse_html(html, category_name, min_discount, seen):
-    soup = BeautifulSoup(html, "html.parser")
-    results = []
-    for card in soup.find_all(class_=re.compile(r"product|card|item", re.I)):
-        try:
-            link = card.find("a", href=True)
-            if not link:
-                continue
-            href = link["href"]
-            url = href if href.startswith("http") else f"{BASE_URL}{href}"
-            if url in seen:
-                continue
-            name_tag = card.find(class_=re.compile(r"title|name|producto", re.I))
-            name = name_tag.get_text(strip=True) if name_tag else link.get_text(strip=True)
-            sale_tag = card.find(class_=re.compile(r"sale|oferta|precio.*desc|price.*sale", re.I))
-            normal_tag = card.find(class_=re.compile(r"compare|original|antes|regular|tachado", re.I))
-            if not sale_tag:
-                continue
-            sale = _clean_price(sale_tag.get_text())
-            normal = _clean_price(normal_tag.get_text()) if normal_tag else None
-            if not sale or not normal or normal <= sale:
-                continue
-            disc = (normal - sale) / normal * 100
-            if disc < min_discount:
-                continue
-            seen.add(url)
-            results.append(Product(name=name[:120], url=url, normal_price=normal,
-                                   sale_price=sale, discount_pct=round(disc, 1),
-                                   category=category_name, store="Skechers"))
-        except Exception:
-            continue
-    return results
-
-
-def scrape_category(url, category_name, min_discount=40.0, max_pages=3, debug=False):
-    all_products, seen, api_responses, page_html = [], set(), [], []
-
-    def handle_response(resp):
-        try:
-            if resp.status == 200 and "json" in resp.headers.get("content-type", "") and "skechers.cl" in resp.url:
-                body = resp.json()
-                if isinstance(body, (dict, list)) and body:
-                    api_responses.append(body)
-        except Exception:
-            pass
+def scrape_category(url: str, category_name: str, min_discount: float = 40.0,
+                    max_pages: int = 3, debug: bool = False) -> list[Product]:
+    all_products: list[Product] = []
+    seen: set = set()
 
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
-            context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", locale="es-CL", viewport={"width": 1920, "height": 1080})
+            browser = pw.chromium.launch(headless=True, args=[
+                "--no-sandbox", "--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"
+            ])
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                locale="es-CL",
+                viewport={"width": 1920, "height": 1080},
+            )
             page = context.new_page()
             if _HAS_STEALTH:
                 stealth_sync(page)
-            page.on("response", handle_response)
+
             try:
-                page.goto(url, wait_until="networkidle", timeout=45000)
-                page.wait_for_timeout(3000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.7)")
+                page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                # Skechers carga productos vía jQuery AJAX después de domcontentloaded
+                page.wait_for_timeout(6000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
                 page.wait_for_timeout(2000)
-                page_html.append(page.content())
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2000)
+
+                html = page.content()
+                found = _parse_html(html, category_name, min_discount, seen)
+                all_products.extend(found)
+
                 if debug:
-                    print(f"  [skechers] {page.title()[:60]} | responses: {len(api_responses)}")
+                    print(f"  [skechers] {category_name}: {page.title()[:40]} | {len(found)} productos")
+
             except PlaywrightTimeout:
-                logging.warning("[skechers] Timeout")
+                logging.warning("[skechers] Timeout en %s", category_name)
                 try:
-                    page_html.append(page.content())
+                    html = page.content()
+                    found = _parse_html(html, category_name, min_discount, seen)
+                    all_products.extend(found)
                 except Exception:
                     pass
             except Exception as e:
                 logging.error("[skechers] Error: %s", e)
+
             browser.close()
+
     except Exception as e:
         logging.error("[skechers] Error general: %s", e)
 
-    for data in api_responses:
-        all_products.extend(_parse_api(data, category_name, min_discount, seen))
-    if not all_products:
-        for html in page_html:
-            all_products.extend(_parse_html(html, category_name, min_discount, seen))
+    logging.info("[skechers] %s: %d productos >= %.0f%%", category_name, len(all_products), min_discount)
+    if debug:
+        print(f"  [skechers] Total: {len(all_products)} productos >= {min_discount:.0f}%")
     return all_products

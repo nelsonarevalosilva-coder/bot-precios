@@ -1,0 +1,19 @@
+[
+  {"name": "Todos los descuentos 70%+",          "url": "https://www.buscalibre.cl/libros/?descuento=70",                                                   "max_pages": 1},
+  {"name": "Ficción",                            "url": "https://www.buscalibre.cl/libros/ficcion/?descuento=70",                                           "max_pages": 1},
+  {"name": "Infantiles / Juveniles",             "url": "https://www.buscalibre.cl/libros/infantiles-juveniles-didactico/?descuento=70",                   "max_pages": 1},
+  {"name": "Comics y Novela Gráfica",            "url": "https://www.buscalibre.cl/libros/novela-grafica/?descuento=70",                                   "max_pages": 1},
+  {"name": "Historia y Arqueología",             "url": "https://www.buscalibre.cl/libros/historia-arqueologia/?descuento=70",                             "max_pages": 1},
+  {"name": "Desarrollo Personal / Salud",        "url": "https://www.buscalibre.cl/libros/salud-relaciones-desarrollo-personal/?descuento=70",             "max_pages": 1},
+  {"name": "Economía / Empresas",                "url": "https://www.buscalibre.cl/libros/ciencias-economicas/?descuento=70",                              "max_pages": 1},
+  {"name": "Ciencias / Matemáticas",             "url": "https://www.buscalibre.cl/libros/matematicas-ciencias/?descuento=70",                             "max_pages": 1},
+  {"name": "Medicina",                           "url": "https://www.buscalibre.cl/libros/medicina/?descuento=70",                                         "max_pages": 1},
+  {"name": "Derecho / Ciencias Sociales",        "url": "https://www.buscalibre.cl/libros/derecho/?descuento=70",                                         "max_pages": 1},
+  {"name": "Deportes / Viajes / Ocio",           "url": "https://www.buscalibre.cl/libros/deportes-actividades-ocio-aire-libre/?descuento=70",             "max_pages": 1},
+
+  {"name": "Editorial Planeta Junior",           "url": "https://www.buscalibre.cl/libros/editorial/planeta-junior/?descuento=70",                        "max_pages": 1},
+  {"name": "Editorial Planeta",                  "url": "https://www.buscalibre.cl/libros/editorial/planeta/?descuento=70",                               "max_pages": 1},
+  {"name": "Editorial Paidós",                   "url": "https://www.buscalibre.cl/libros/editorial/paidos/?descuento=70",                                "max_pages": 1},
+  {"name": "Editorial Ediciones B",              "url": "https://www.buscalibre.cl/libros/editorial/ediciones-b/?descuento=70",                           "max_pages": 1},
+  {"name": "Editorial Seix Barral",              "url": "https://www.buscalibre.cl/libros/editorial/seix-barral/?descuento=70",                           "max_pages": 1}
+]

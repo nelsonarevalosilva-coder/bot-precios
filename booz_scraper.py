@@ -26,6 +26,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Booz"
+    image_url: str = ""
 
 
 def _parse_price(text: str) -> int:
@@ -46,6 +47,7 @@ def _extract_products(soup: BeautifulSoup, category_name: str, min_discount: flo
         name = img.get("alt", "").strip() if img else ""
         if not name:
             continue
+        image_url = (img.get("data-src") or img.get("src") or "") if img else ""
 
         # Walk up to find the card container (has both prices)
         card = a
@@ -85,6 +87,7 @@ def _extract_products(soup: BeautifulSoup, category_name: str, min_discount: flo
             discount_pct=discount_pct,
             category=category_name,
             store="Booz",
+            image_url=image_url,
         ))
 
     # Deduplicate by URL

@@ -25,6 +25,7 @@ class Product:
     discount_pct: float
     category: str
     store: str = "Liquidos"
+    image_url: str = ""
 
 
 def scrape_category(
@@ -73,6 +74,7 @@ def scrape_category(
 
         name = p.get("name", "Sin nombre")
         sub_family = p.get("sub_family") or p.get("family") or category_name
+        image_url = p.get("image", "")
 
         results.append(Product(
             name=name,
@@ -82,6 +84,7 @@ def scrape_category(
             discount_pct=discount_pct,
             category=sub_family,
             store="Liquidos",
+            image_url=image_url,
         ))
 
     if debug:

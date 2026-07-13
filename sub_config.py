@@ -4,7 +4,7 @@ CHANNELS = {
     "tecnologia":    {"id": -1003633911277, "name": "💻 Tecnología"},
     "muebles_hogar": {"id": -1003804002653, "name": "🛋️ Muebles y Hogar"},
     "electro":       {"id": -1003911147571, "name": "🏠 Electrodomésticos"},
-    "perfumes":      {"id": -1003980648018, "name": "💄 Perfumes y Belleza"},
+    "perfumes":      {"id": -1003980648018, "name": "💄 Perfumes"},
     "gaming":        {"id": -1004290755569, "name": "🎮 Gaming"},
     "zapatillas":    {"id": -1003900467811, "name": "👟 Zapatillas"},
     "outdoor":       {"id": -1003907913373, "name": "⛺ Outdoor y Camping"},
@@ -13,6 +13,16 @@ CHANNELS = {
     "automotriz":    {"id": -1003962932016, "name": "🚗 Automotriz"},
     "ferreteria":    {"id": -1003848024596, "name": "🔧 Ferretería"},
     "licores":       {"id": -1004053668233, "name": "🍷 Licores"},
+    "belleza":       {"id": -1003936872606, "name": "💅 Belleza"},
+    "farmacia":      {"id": -1003636628389, "name": "💊 Farmacia y Salud"},
+    "jugueteria":    {"id": -1003791149328, "name": "🧸 Juguetería"},
+    "mascotas":      {"id": -1004287587407, "name": "🐾 Mascotas"},
+    "libros":        {"id": -1004298629705, "name": "📚 Libros"},
+    "audio":         {"id": -1003975359758, "name": "🎧 Audio"},
+    "supermercado":  {"id": -1003713534233, "name": "🛒 Supermercado"},
+    "super_ofertas": {"id": -1003993751567, "name": "⚡ Super Ofertas"},
+    "error_precios": {"id": -1004415049589, "name": "🚨 Error de Precios"},
+    "delivery":      {"id": -1004304585105, "name": "🚀 Delivery Super Ofertas"},
 }
 
 # Precios en CLP — ajusta según tus objetivos

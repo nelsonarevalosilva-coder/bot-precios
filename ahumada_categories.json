@@ -1,3 +1,27 @@
 [
-  {"name": "Promociones", "url": "https://www.farmaciasahumada.cl/promociones"}
+  {"name": "Bebidas y Bebestibles",      "url": "https://www.farmaciasahumada.cl/bebidas-y-alimentos/bebestibles"},
+  {"name": "Gripe y Resfrios",           "url": "https://www.farmaciasahumada.cl/medicamentos/sistema-respiratorio-y-alergias/gripe-y-resfrios"},
+  {"name": "Suplementos",               "url": "https://www.farmaciasahumada.cl/vitaminas-y-suplementos/suplementos-alimenticios"},
+  {"name": "Proteccion Femenina",        "url": "https://www.farmaciasahumada.cl/higiene-y-cuidado-personal/cuidado-mujer/proteccion-femenina"},
+  {"name": "Pastas Dentales",            "url": "https://www.farmaciasahumada.cl/higiene-y-cuidado-personal/cuidado-bucal/pastas-dentales"},
+  {"name": "Eucerin",                   "url": "https://www.farmaciasahumada.cl/dermocosmetica/marcas/eucerin"},
+  {"name": "Cetaphil",                  "url": "https://www.farmaciasahumada.cl/dermocosmetica/marcas/cetaphil"},
+  {"name": "Vitaminas y Minerales",      "url": "https://www.farmaciasahumada.cl/vitaminas-y-suplementos/vitaminas-y-minerales"},
+  {"name": "Probioticos",               "url": "https://www.farmaciasahumada.cl/medicamentos/sistema-digestivo/probioticos"},
+  {"name": "Cuidado Hombre",             "url": "https://www.farmaciasahumada.cl/higiene-y-cuidado-personal/cuidado-hombre"},
+  {"name": "Electricos Higiene",         "url": "https://www.farmaciasahumada.cl/higiene-y-cuidado-personal/electricos"},
+  {"name": "Dermocosmetica",            "url": "https://www.farmaciasahumada.cl/dermocosmetica"},
+  {"name": "Cuidado Capilar Belleza",    "url": "https://www.farmaciasahumada.cl/belleza/cuidado-capilar"},
+  {"name": "Preservativos",             "url": "https://www.farmaciasahumada.cl/bienestar-sexual/preservativos"},
+  {"name": "Incontinencia",             "url": "https://www.farmaciasahumada.cl/cuidado-adulto/incontinencia"},
+  {"name": "Primeros Auxilios",          "url": "https://www.farmaciasahumada.cl/proteccion-y-prevencion/primeros-auxilios"},
+  {"name": "Proteccion Solar Derma",     "url": "https://www.farmaciasahumada.cl/dermocosmetica/proteccion-solar"},
+  {"name": "Panales Extra Grande",       "url": "https://www.farmaciasahumada.cl/infantil-y-maternidad/mundo-panales/extra-grande"},
+  {"name": "Higiene Infantil",           "url": "https://www.farmaciasahumada.cl/infantil-y-maternidad/higiene-infantil"},
+  {"name": "Desodorante Mujer",          "url": "https://www.farmaciasahumada.cl/higiene-y-cuidado-personal/desodorantes-y-antitranspirantes/desodorante-mujer"},
+  {"name": "Desodorante Hombre",         "url": "https://www.farmaciasahumada.cl/higiene-y-cuidado-personal/desodorantes-y-antitranspirantes/desodorante-hombre"},
+  {"name": "Analgesicos",               "url": "https://www.farmaciasahumada.cl/medicamentos/dolor--fiebre-e-inflamacion/analgesicos"},
+  {"name": "Sistema Digestivo",          "url": "https://www.farmaciasahumada.cl/medicamentos/sistema-digestivo"},
+  {"name": "Maquillaje y Accesorios",    "url": "https://www.farmaciasahumada.cl/belleza/maquillaje-y-accesorios"},
+  {"name": "Promociones",               "url": "https://www.farmaciasahumada.cl/promociones"}
 ]
