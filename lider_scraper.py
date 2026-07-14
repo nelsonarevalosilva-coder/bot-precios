@@ -168,8 +168,15 @@ def scrape(min_discount: float = 30.0, debug: bool = False) -> list[Product]:
     all_products: list[Product] = []
     seen: set = set()
 
+    _BROWSER_ARGS = [
+        "--window-size=1280,800",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+    ]
+
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False, args=["--window-size=1280,800"])
+        browser = pw.chromium.launch(headless=False, args=_BROWSER_ARGS)
         ctx = browser.new_context(
             locale="es-CL",
             viewport={"width": 1280, "height": 800},
@@ -184,6 +191,12 @@ def scrape(min_discount: float = 30.0, debug: bool = False) -> list[Product]:
             print(f"  [lider] URLs to scrape: {all_urls}")
 
         for url in all_urls:
+            # If page died, open a fresh one
+            try:
+                page.title()
+            except Exception:
+                page = ctx.new_page()
+
             products = _scrape_page(page, url, min_discount, seen, debug)
             all_products.extend(products)
             time.sleep(1)
