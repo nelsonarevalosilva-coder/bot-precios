@@ -38,6 +38,7 @@ class Product:
     store: str = "Buscalibre"
     image_url: str = ""
     seller: str = ""
+    author: str = ""
 
 
 def _clean_price(text: str) -> int:
@@ -98,6 +99,10 @@ def _parse_products(soup, category_name: str, min_discount: float, seen: set) ->
             img = box.select_one("img.lazyload")
             image_url = img.get("data-src", "") if img else ""
 
+            # Author
+            autor_el = box.select_one(".autor") or box.select_one("p.autor") or box.select_one(".datos-libro .autor")
+            author = autor_el.get_text(strip=True) if autor_el else ""
+
             products.append(Product(
                 name=name[:120],
                 url=product_url,
@@ -107,6 +112,7 @@ def _parse_products(soup, category_name: str, min_discount: float, seen: set) ->
                 category=category_name,
                 store="Buscalibre",
                 image_url=image_url,
+                author=author,
             ))
         except Exception:
             continue

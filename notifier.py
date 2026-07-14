@@ -775,6 +775,8 @@ def notify_big_discount(product, min_data=None, last_prices=None, prev_notified_
     channel = get_channel_for_product(product)
     hist = _history_block(product.sale_price, min_data, last_prices or [])
     seller_info = _seller_line(product)
+    author = getattr(product, "author", "")
+    author_line = f"\n✍️ Autor: <b>{author}</b>" if author else ""
 
     prev_line = ""
     if prev_notified_price and prev_notified_price > product.sale_price:
@@ -787,7 +789,8 @@ def notify_big_discount(product, min_data=None, last_prices=None, prev_notified_
 
     text = (
         f"🔥 <b>OFERTA {product.discount_pct:.0f}% DESCUENTO en {store}</b>\n\n"
-        f"📦 <b>{product.name}</b>\n"
+        f"📦 <b>{product.name}</b>"
+        f"{author_line}\n"
         f"🏷️ Categoría: {product.category}"
         f"{seller_info}\n"
         f"💰 Precio normal: <s>{_fmt_price(product.normal_price)}</s>\n"
