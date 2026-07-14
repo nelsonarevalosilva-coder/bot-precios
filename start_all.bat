@@ -3,6 +3,15 @@ title Cazador de Precios — Servidor
 
 cd /d "C:\Users\narev\Desktop\OPEN\ripley-monitor"
 
+echo Cerrando procesos anteriores...
+taskkill /f /im ngrok.exe >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq Catalog Monitor" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq Payment Server" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq Sub Bot" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq Expiry Checker" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq Search Bot" >nul 2>&1
+timeout /t 2 /nobreak >nul
+
 echo Iniciando monitor de catalogo...
 start "Catalog Monitor" python catalog_monitor.py
 
