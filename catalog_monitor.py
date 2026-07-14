@@ -100,6 +100,7 @@ import corona_scraper
 import buscalibre_scraper
 import santa_isabel_scraper
 import unimarc_scraper
+import lider_scraper
 import rappi_monitor
 import ubereats_monitor
 from notifier import notify_big_discount, notify_catalog_summary, notify_price_error, get_channel_key_for_product
@@ -275,6 +276,50 @@ def scan_store(categories: list[dict], scraper_module, store_name: str, min_disc
     return total_alerts, total_errors, len(categories)
 
 
+def scan_lider(min_discount: float = 20.0, debug: bool = False) -> tuple[int, int]:
+    """Escanea Lider (Playwright). Retorna (alertas, errores)."""
+    logging.info(">> [Lider] Escaneando con Playwright...")
+    try:
+        products = lider_scraper.scrape(min_discount=min_discount, debug=debug)
+    except Exception as e:
+        logging.error(f"  [Lider] Error al escanear: {e}")
+        return 0, 0
+
+    total_alerts = 0
+    total_errors = 0
+
+    for p in products:
+        tag = "ERROR PRECIO" if p.discount_pct >= PRICE_ERROR_THRESHOLD else "OFERTA"
+        logging.info(f"    [{tag}] {p.name[:55]} | {p.discount_pct:.0f}% | ${p.sale_price:,}")
+
+        min_data = get_min_price_with_date(p.url)
+        last_prices = get_last_prices(p.url, limit=5)
+        prev_notified_price = get_last_notified_price(p.url)
+        save_price(p.name, p.url, p.sale_price)
+
+        if has_been_notified(p.url, p.sale_price):
+            prev_str = f"${prev_notified_price:,}" if prev_notified_price else "precio anterior"
+            logging.info(f"      (ya notificado a {prev_str} — sin mejora)")
+            continue
+
+        ok = False
+        if p.discount_pct >= PRICE_ERROR_THRESHOLD:
+            ok = notify_price_error(p, min_data, last_prices)
+            if ok:
+                total_errors += 1
+        else:
+            ok = notify_big_discount(p, min_data, last_prices, prev_notified_price=prev_notified_price)
+            if ok:
+                total_alerts += 1
+
+        if ok:
+            ch_key = get_channel_key_for_product(p)
+            mark_notified(p.url, p.name, p.discount_pct, p.sale_price, ch_key)
+
+    logging.info(f"[Lider] TERMINADO — ofertas: {total_alerts} | errores precio: {total_errors}")
+    return total_alerts, total_errors
+
+
 def run_catalog_scan(
     min_discount: float = MIN_DISCOUNT,
     only_store: str | None = None,
@@ -302,7 +347,7 @@ def run_catalog_scan(
             return 25.0
         if store_name == "Buscalibre":
             return 70.0
-        if store_name in {"Jumbo", "Santa Isabel", "Unimarc"}:
+        if store_name in {"Jumbo", "Santa Isabel", "Unimarc", "Lider"}:
             return 20.0
         return min_discount
 
@@ -456,13 +501,13 @@ def run_catalog_scan(
     if only_store is None or only_store.lower() == "unimarc":
         stores_to_run.append((load_json(UNIMARC_CATEGORIES_FILE), unimarc_scraper, "Unimarc", _store_discount("Unimarc")))
 
-    logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run)}")
+    logging.info(f"Escaneando en paralelo: {', '.join(s[2] for s in stores_to_run) or '(ninguna)'}")
 
     total_alerts = 0
     total_errors = 0
     total_cats = 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(stores_to_run)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(stores_to_run))) as executor:
         future_to_store = {
             executor.submit(scan_store, cats, module, name, store_discount, debug): name
             for cats, module, name, store_discount in stores_to_run
@@ -482,10 +527,17 @@ def run_catalog_scan(
     logging.info(f"Escaneo completado — Ofertas: {total_alerts} | Errores precio: {total_errors}")
     logging.info(f"{'='*60}")
 
+    # Lider: Playwright, corre aparte del pool paralelo
+    if only_store is None or only_store.lower() == "lider":
+        a, e = scan_lider(min_discount=_store_discount("Lider"), debug=debug)
+        total_alerts += a
+        total_errors += e
+
     # Supermercados: re-notificar al día siguiente (precios cambian diario)
     clear_old_notifications(days=1, url_pattern="%jumbo%")
     clear_old_notifications(days=1, url_pattern="%santaisabel%")
     clear_old_notifications(days=1, url_pattern="%unimarc%")
+    clear_old_notifications(days=1, url_pattern="%lider.cl%")
     # Resto de tiendas: 7 días
     clear_old_notifications(days=7)
 
@@ -502,7 +554,7 @@ def main():
     parser = argparse.ArgumentParser(description="Monitor de precios Ripley + Falabella Chile")
     parser.add_argument("--once", action="store_true", help="Escanear una vez y salir")
     parser.add_argument("--debug", action="store_true", help="Modo debug del scraper")
-    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop", "mundoaromas", "cosmetic", "alishaperfumes", "lodoro", "santiagoperfumes", "adidas", "nike", "ofertaperfumes", "yauras", "eliteperfumes", "sairam", "mercadolibre", "bata", "newbalance", "converse", "skechers", "decathlon", "underarmour", "zara", "bershka", "pullandbear", "stradivarius", "hm", "levis", "tommy", "calvinklein", "tricot", "xiaomi", "corona", "buscalibre", "santaisabel", "unimarc"], help="Solo esta tienda")
+    parser.add_argument("--store", type=str, default=None, choices=["ripley", "falabella", "paris", "easy", "sodimac", "jumbo", "abc", "columbia", "doite", "hushpuppies", "pcfactory", "multimarcas", "reebok", "bold", "wildlama", "mundovino", "liquidos", "booz", "ikea", "amoble", "silkperfumes", "blushbar", "sallybeauty", "sokobox", "gotta", "saxoline", "kippichile", "rosen", "ahumada", "cruzverde", "thebodyshop", "mundoaromas", "cosmetic", "alishaperfumes", "lodoro", "santiagoperfumes", "adidas", "nike", "ofertaperfumes", "yauras", "eliteperfumes", "sairam", "mercadolibre", "bata", "newbalance", "converse", "skechers", "decathlon", "underarmour", "zara", "bershka", "pullandbear", "stradivarius", "hm", "levis", "tommy", "calvinklein", "tricot", "xiaomi", "corona", "buscalibre", "santaisabel", "unimarc", "lider"], help="Solo esta tienda")
     args = parser.parse_args()
 
     setup_logging(debug=args.debug)

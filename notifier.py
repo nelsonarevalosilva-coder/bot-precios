@@ -152,6 +152,7 @@ STORE_CHANNEL = {
     "PetHome":              "mascotas",
     "SuperZoo":             "mascotas",
     "Laika":                "mascotas",
+    "Lider":                "supermercado",
 }
 
 # Keywords de categoría → canal (el primer match gana)
