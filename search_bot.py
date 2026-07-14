@@ -21,6 +21,7 @@ from telegram.ext import (
 
 load_dotenv()
 TOKEN = os.getenv("SEARCH_BOT_TOKEN")
+OWNER_ID = int(os.getenv("OWNER_TELEGRAM_ID", "0"))
 DB_PATH = Path(__file__).parent / "prices.db"
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -128,17 +129,19 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    subs = get_active_subscriptions(user_id)
-    if not subs:
-        await update.message.reply_text(
-            "🔒 <b>Acceso exclusivo para suscriptores</b>\n\n"
-            "Este buscador es solo para clientes con suscripción activa.\n\n"
-            "👉 Escribe /suscribir en @Cazador_precios_cl_chile_bot para activar tu acceso.",
-            parse_mode="HTML",
-        )
-        return
-
-    channel_keys = list({s["channel_key"] for s in subs})
+    if user_id == OWNER_ID:
+        channel_keys = ["all"]
+    else:
+        subs = get_active_subscriptions(user_id)
+        if not subs:
+            await update.message.reply_text(
+                "🔒 <b>Acceso exclusivo para suscriptores</b>\n\n"
+                "Este buscador es solo para clientes con suscripción activa.\n\n"
+                "👉 Escribe /suscribir en @Cazador_precios_cl_chile_bot para activar tu acceso.",
+                parse_mode="HTML",
+            )
+            return
+        channel_keys = list({s["channel_key"] for s in subs})
 
     query = update.message.text.strip()
 
